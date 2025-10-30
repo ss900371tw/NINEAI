@@ -122,6 +122,7 @@ def parse_transparency_response(response_text):
     summary = "未發現相關描述"
 
     m = re.search(r"狀態\s*[:：]\s*(存在|不存在)", response_text)
+    
     if m:
         status = m.group(1).strip()
     else:
@@ -130,7 +131,7 @@ def parse_transparency_response(response_text):
         elif "不存在" in response_text:
             status = "不存在"
 
-    m2 = re.search(r"摘要\s*[:：]\s*(.+?)(?:\n|$)", response_text, flags=re.DOTALL)
+    m2 = re.search(r"摘要\s*[:：]\s*([\s\S]+)", response_text)
     if m2:
         summary = m2.group(1).strip()
     else:
