@@ -134,7 +134,7 @@ def parse_transparency_response(response_text):
     if m2:
         summary = m2.group(1).strip()
     else:
-        summary = original[:300].replace("\n", " ").strip()
+        summary = original.replace("\n", " ").strip()
 
     return {"狀態": status, "摘要": summary}
 
