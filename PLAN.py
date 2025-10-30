@@ -23,7 +23,6 @@ genai.configure(api_key=GOOGLE_API_KEY)
 
 # 使用 Gemini 2.5 Pro 模型
 model = genai.GenerativeModel("gemini-2.5-pro")
-chat = model.start_chat()
 
 
 # FAISS 向量庫初始化（請確保 INDEX_FILE_PATH 與 embeddings 設定正確）
@@ -62,12 +61,25 @@ def extract_text_by_line(pdf_bytes):
     return "\n\n".join(lines)
 
 def get_gemini_response(prompt):
-    """使用 Gemini 模型回應"""
+    """使用 Gemini 模型回應（改為無狀態的 generate_content）"""
     try:
-        response = chat.send_message(prompt)
+        # 錯誤的用法： response = chat.send_message(prompt)
+        # 正確的用法：
+        response = model.generate_content(prompt) 
+        
         return response.text.strip()
     except Exception as e:
-        return f"⚠️ Gemini 呼叫錯誤：{e}"
+        # 檢查是否有因為內容過長或安全設定而被阻擋
+        try:
+            # 嘗試讀取更詳細的錯誤（如果 API 回應中有）
+            error_details = str(e)
+            if response.prompt_feedback:
+                 error_details = f"Prompt blocked: {response.prompt_feedback}"
+            elif response.candidates and response.candidates[0].finish_reason != 'STOP':
+                 error_details = f"Generation stopped: {response.candidates[0].finish_reason}"
+            return f"⚠️ Gemini 呼叫錯誤：{error_details}"
+        except:
+             return f"⚠️ Gemini 呼叫錯誤：{e}"
         
         
 def build_transparency_prompts(principles, full_text, rag_docs_k=3):
