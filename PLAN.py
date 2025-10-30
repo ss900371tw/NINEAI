@@ -55,7 +55,7 @@ def extract_text_by_line(pdf_bytes):
     for page in doc:
         blocks = page.get_text("blocks")
         for b in blocks:
-            text = b.strip()
+            text = b[4].strip()
             if text:
                 lines.append(text)
     return "\n\n".join(lines)
