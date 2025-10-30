@@ -99,7 +99,7 @@ def build_transparency_prompts(principles, full_text, rag_docs_k=3):
     for p in principles:
         prompt = f"""
 ---- 要請你說明的透明性原則 ----
-{p}
+{p.split('：', 1)[0]}
 你是一位使用繁體中文的透明性原則講解員，請根據下方「申請文件內容」判斷：
 1.是否存在相關描述讓你可以 {p.split('：', 1)[1]}
 2.請 {p.split('：', 1)[1]}
