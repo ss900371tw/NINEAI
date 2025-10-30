@@ -123,8 +123,8 @@ def parse_transparency_response(response_text):
     status = "無法判讀"
     summary = "未發現相關描述"
 
+    # --- 判斷狀態 ---
     m = re.search(r"狀態\s*[:：]\s*(存在|不存在)", response_text)
-    
     if m:
         status = m.group(1).strip()
     else:
@@ -133,11 +133,16 @@ def parse_transparency_response(response_text):
         elif "不存在" in response_text:
             status = "不存在"
 
+    # --- 抓取摘要內容 ---
     m2 = re.search(r"摘要\s*[:：]\s*([\s\S]+)", response_text)
     if m2:
         summary = m2.group(1).strip()
     else:
         summary = original.replace("\n", " ").strip()
+
+    # ✅ 強制規則：若狀態為「不存在」，摘要改為「未見相關描述」
+    if status == "不存在":
+        summary = "未見相關描述"
 
     return {"狀態": status, "摘要": summary}
 
