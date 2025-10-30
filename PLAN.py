@@ -89,7 +89,7 @@ def build_transparency_prompts(principles, full_text, rag_docs_k=3):
     prompts = []
     rag_context = ""
     if vector_store:
-        merged_query = " ".join(principles[:3])
+        merged_query = " ".join(principles)
         try:
             docs = vector_store.similarity_search(merged_query, k=rag_docs_k)
             rag_context = "\n---\n".join(doc.page_content for doc in docs)
@@ -98,12 +98,11 @@ def build_transparency_prompts(principles, full_text, rag_docs_k=3):
 
     for p in principles:
         prompt = f"""
+---- 要請你說明的透明性原則 ----
+{p}
 你是一位使用繁體中文的透明性原則講解員，請根據下方「申請文件內容」判斷：
 1.是否存在相關描述讓你可以回答出下列要請你說明的透明性原則
 2.請完成該透明性原則要請你完成的任務。
-
----- 要請你說明的透明性原則 ----
-{p}
 ---- 文件內容（節錄） ----
 {full_text}
 ---- 向量檢索到的相關參考段落（若有） ----
