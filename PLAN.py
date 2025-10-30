@@ -87,7 +87,7 @@ def build_transparency_prompts(principles, full_text, rag_docs_k=3):
     for p in principles:
         prompt = f"""
 你是一位使用繁體中文的透明性原則講解員，請根據下方「申請文件內容」判斷：
-1.是否明確涵蓋下列要請你說明的透明性原則
+1.是否存在相關描述讓你可以回答出下列要請你說明的透明性原則
 2.請完成該透明性原則要請你完成的任務。
 
 ---- 要請你說明的透明性原則 ----
@@ -97,8 +97,8 @@ def build_transparency_prompts(principles, full_text, rag_docs_k=3):
 ---- 向量檢索到的相關參考段落（若有） ----
 {rag_context}
 ---- 回覆格式（請**嚴格**遵守，以利程式解析）----
-狀態: 存在 / 不存在
-摘要: （一至兩行，說明該人工智慧的透明性原則。若不存在，請寫「未發現相關描述」。）
+狀態:  存在 / 不存在
+摘要: （說明該人工智慧的透明性原則。若不存在，請寫「未發現相關描述」。）
 ---- 結束 ----
 """
         prompts.append(prompt.strip())
