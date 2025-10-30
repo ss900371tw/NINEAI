@@ -106,6 +106,8 @@ def build_transparency_prompts(principles, full_text, rag_docs_k=3):
 {p}
 ---- 文件內容（節錄） ----
 {full_text}
+---- 向量檢索到的相關參考段落（若有） ----
+{rag_context}
 ---- 回覆格式（請**嚴格**遵守，以利程式解析）----
 狀態:  存在 / 不存在
 摘要: （說明該人工智慧的透明性原則。若不存在，請寫「未發現相關描述」。）
