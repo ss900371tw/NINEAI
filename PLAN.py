@@ -80,6 +80,21 @@ def get_gemini_response(prompt):
             return f"⚠️ Gemini 呼叫錯誤：{error_details}"
         except:
              return f"⚠️ Gemini 呼叫錯誤：{e}"
+
+
+def gen_missing_suggestion(principle_text):
+    """若文件未涵蓋某透明性原則，請 Gemini 生成建議補充內容"""
+    prompt = f"""
+你是一位專業 AI 模型透明性報告撰寫員。
+下列為透明性原則說明，請寫出「若要補上本原則，你會怎麼撰寫？」以符合標準。
+
+透明性原則內容：
+{principle_text}
+
+請用繁體中文撰寫，語氣正式、能直接貼入報告文件。
+"""
+    resp = get_gemini_response(prompt)
+    return resp.strip()
         
         
 def build_transparency_prompts(principles, full_text, rag_docs_k=3):
@@ -172,15 +187,21 @@ def main():
                 prompt = prompts[i]
                 resp = get_gemini_response(prompt)
                 parsed = parse_transparency_response(resp)
+
+                suggestion = ""
+                if parsed["摘要"] == "未見相關描述":
+                    suggestion = gen_missing_suggestion(p)
+
                 results.append({
                     "原則編號": i+1,
                     "原則名稱": p,
                     "狀態": parsed["狀態"],
                     "摘要": parsed["摘要"],
+                    "建議補充內容": suggestion,
                 })
 
         df = pd.DataFrame(results)
-        df = df[["原則編號", "原則名稱", "狀態", "摘要"]]
+        df = df[["原則編號", "原則名稱", "狀態", "摘要", "建議補充內容"]]
 
         st.success("✅ 檢核完成")
         st.markdown(f"檔案：**{uploaded_pdf.name}**  → 共有 {len(df)} 項檢核結果")
@@ -198,7 +219,8 @@ def main():
         for idx, row in df.iterrows():
             with st.expander(f"🔎 第 {row['原則編號']} 項：{row['原則名稱']} — 狀態：{row['狀態']}"):
                 st.markdown(f"**摘要**：{row['摘要']}")
-
+                if row["摘要"] == "未見相關描述":
+                    st.markdown(f"**建議補充內容**：{row['建議補充內容']}")
 
     elif not uploaded_pdf:
         st.info("請先上傳一份 PDF，然後按【開始檢核】。")
