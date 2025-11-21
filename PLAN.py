@@ -22,7 +22,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # 使用 Gemini 2.5 Pro 模型
-model = genai.GenerativeModel("gemini-3-pro")
+model = genai.GenerativeModel("gemini-3-pro-preview")
 
 
 # FAISS 向量庫初始化（請確保 INDEX_FILE_PATH 與 embeddings 設定正確）
