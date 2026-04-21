@@ -152,30 +152,51 @@ def analyze_item(item, context_text, rag_history=""):
     except Exception as e:
         return {"status": "檢核錯誤", "summary": f"API 錯誤: {str(e)}", "suggestion": ""}
 
-def run_full_analysis(full_text):
-    """執行完整分析流程"""
-    all_items = TRANSPARENCY_9 + GOVERNANCE_2
-    
-    # --- 關鍵修改：先載入 RAG 資料 ---
-    try:
-        rag_df = get_rag_df_from_github()
-    except:
-        rag_df = pd.DataFrame()
 
-    def process_with_rag(item):
-        # 從 CSV 篩選出與目前項目相關的過去建議（取最近 3 筆避免內容過長）
-        history = ""
-        if not rag_df.empty and "Principle" in rag_df.columns:
-            rel_rows = rag_df[rag_df["Principle"] == item["title"]]
-            if not rel_rows.empty:
-                history = "\n".join([f"- {fb}" for fb in rel_rows["UserFeedback"].tail(3).tolist()])
+
+import numpy as np
+
+def get_embedding(text):
+    """將文字轉換為向量"""
+    result = genai.embed_content(
+        model="models/text-embedding-004",
+        content=text,
+        task_type="retrieval_query"
+    )
+    return result['embedding']
+
+def cosine_similarity(v1, v2):
+    """計算餘弦相似度"""
+    return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+    
+    
+def run_full_analysis(item, full_text, rag_df):
+    history = ""
+    if not rag_df.empty and "UserFeedback" in rag_df.columns:
+        # 1. 準備搜尋目標（原則標題 + 定義）
+        query_text = f"{item['title']}: {item['desc']}"
+        query_vec = get_embedding(query_text)
         
-        return analyze_item(item, full_text, rag_history=history)
+        # 2. 篩選出同類別的紀錄（縮小比對範圍提高效率）
+        rel_rows = rag_df[rag_df["Principle"] == item["title"]].copy()
+        
+        if not rel_rows.empty:
+            # 3. 計算每一筆回饋的相似度 (這部分若資料量大建議快取 Embedding)
+            # 為了 demo 簡化，假設現場計算
+            similarities = []
+            for fb in rel_rows["UserFeedback"].tolist():
+                fb_vec = get_embedding(fb)
+                similarities.append(cosine_similarity(query_vec, fb_vec))
+            
+            rel_rows["sim"] = similarities
+            
+            # 4. 取 Top 3 相似的回饋
+            top_3 = rel_rows.sort_values(by="sim", ascending=False).head(3)
+            history = "\n".join([f"- {row['UserFeedback']}" for _, row in top_3.iterrows()])
 
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        results = list(executor.map(process_with_rag, all_items))
-    
-    return {"t": results[:9], "g": results[9:]}
+    return analyze_item(item, full_text, rag_history=history)
+
+
 
 # ---------- 4. UI 介面 ----------
 
