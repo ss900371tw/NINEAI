@@ -14,7 +14,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # 使用 Gemini 模型
-model = genai.GenerativeModel("gemini-2.5-pro") # 建議使用 flash 速度較快，或維持您的 gemini-3-pro-preview
+model = genai.GenerativeModel("gemini-1.5-flash") # 建議使用 flash 速度快且穩定
 
 # FAISS 向量庫初始化
 INDEX_FILE_PATH = "faiss_index"
@@ -45,7 +45,7 @@ def inject_custom_css():
     .flip-card {
       background-color: transparent;
       width: 100%;
-      height: 280px;
+      height: 320px; /* 稍微增加高度以容納更多文字 */
       perspective: 1000px;
       margin-bottom: 25px;
     }
@@ -70,29 +70,41 @@ def inject_custom_css():
       height: 100%;
       -webkit-backface-visibility: hidden;
       backface-visibility: hidden;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      padding: 20px;
       border-radius: 12px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box; /* 確保 padding 不會撐破容器 */
     }
 
     /* 正面顏色：漸層藍紫 */
     .flip-card-front {
       background: linear-gradient(135deg, #4b6cb7 0%, #182848 100%);
       color: white;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
     }
 
-    /* 背面顏色：淺灰白 */
+    /* 背面顏色：純白 */
     .flip-card-back {
       background-color: #ffffff;
       color: #2c3e50;
       transform: rotateY(180deg);
       border: 1px solid #e0e0e0;
-      overflow-y: auto;
-      justify-content: flex-start;
+      padding: 15px;
+      text-align: left;
+      /* 關鍵：處理溢出內容 */
+      overflow-y: auto; 
+    }
+
+    /* 美化滾動條 */
+    .flip-card-back::-webkit-scrollbar {
+      width: 5px;
+    }
+    .flip-card-back::-webkit-scrollbar-thumb {
+      background: #cbd5e0;
+      border-radius: 10px;
     }
 
     .status-badge {
@@ -101,21 +113,31 @@ def inject_custom_css():
       border-radius: 20px;
       font-size: 0.85em;
       font-weight: bold;
+      color: white;
     }
     
     .summary-text {
       font-size: 0.9em;
-      text-align: left;
-      line-height: 1.5;
+      line-height: 1.6;
+      margin-bottom: 10px;
+      white-space: pre-wrap; /* 保留換行 */
     }
     
     .suggestion-box {
-      margin-top: 10px;
-      padding: 8px;
+      margin-top: auto; /* 推到底部 */
+      padding: 10px;
       background-color: #fff5f5;
       border-left: 4px solid #f56565;
-      font-size: 0.8em;
-      text-align: left;
+      font-size: 0.85em;
+    }
+
+    .card-title-back {
+      font-weight: bold;
+      font-size: 1em;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 5px;
+      margin-bottom: 10px;
+      flex-shrink: 0;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -133,12 +155,14 @@ def extract_text_by_line(pdf_bytes):
 def get_gemini_response(prompt):
     try:
         response = model.generate_content(prompt)
-        return response.text.strip()
+        # 移除可能干擾 HTML 的 Markdown 代碼塊標記
+        clean_text = response.text.replace("```html", "").replace("```", "").strip()
+        return clean_text
     except Exception as e:
         return f"⚠️ 錯誤：{e}"
 
 def gen_missing_suggestion(principle_text):
-    prompt = f"你是一位專業 AI 模型透明性報告撰寫員。若文件未涵蓋下列原則，請寫出建議補上的內容：\n\n{principle_text}\n\n請用正式繁體中文撰寫。"
+    prompt = f"你是一位專業 AI 模型透明性報告撰寫員。針對下列原則缺失，請提供具體的補強建議內容。請直接輸出文字，不要包含任何代碼框或標籤：\n\n{principle_text}\n\n請用正式繁體中文撰寫。"
     return get_gemini_response(prompt)
 
 def build_transparency_prompts(principles, full_text, rag_docs_k=3):
@@ -152,6 +176,8 @@ def build_transparency_prompts(principles, full_text, rag_docs_k=3):
         title = p.split('：', 1)[0]
         desc = p.split('：', 1)[1]
         prompt = f"""
+你是一個稽核員。請判斷下方「文件內容」是否包含「要求」中的描述。
+
 ---- 透明性原則 ----
 項目：{title}
 要求：{desc}
@@ -162,9 +188,9 @@ def build_transparency_prompts(principles, full_text, rag_docs_k=3):
 ---- 參考背景 ----
 {rag_context}
 
----- 回覆格式 ----
-狀態: 存在 / 不存在
-摘要: (請摘要說明，若不存在則寫「未見相關描述」)
+---- 回覆格式 (嚴格遵守) ----
+狀態: [存在 / 不存在]
+摘要: [如果是存在，請簡要總結；如果不存在，請寫「未見相關描述」]
 """
         prompts.append(prompt.strip())
     return prompts
@@ -183,9 +209,9 @@ def main():
     inject_custom_css()
     
     st.title("📄 AI 介入透明性 — 九宮格自動檢核")
-    st.markdown("上傳 IRB 文件，系統將自動比對九大原則並以**翻轉卡片**呈現結果。")
+    st.markdown("上傳 IRB 文件，系統將自動比對九大原則並以翻轉卡片呈現結果。")
 
-    # 側邊欄控制
+    # 側邊欄
     with st.sidebar:
         st.header("操作面板")
         uploaded_pdf = st.file_uploader("📥 上傳 PDF 文件", type=["pdf"])
@@ -210,7 +236,7 @@ def main():
                 parsed = parse_transparency_response(resp)
                 
                 suggestion = ""
-                if parsed["摘要"] == "未見相關描述":
+                if parsed["狀態"] == "不存在":
                     suggestion = gen_missing_suggestion(p)
                 
                 results.append({
@@ -223,11 +249,9 @@ def main():
             st.session_state['results'] = results
             st.session_state['df_data'] = pd.DataFrame(results)
 
-    # 呈現結果 (九宮格翻牌)
+    # 呈現結果
     if 'results' in st.session_state:
         res = st.session_state['results']
-        
-        # 顯示統計
         found_count = sum(1 for x in res if x['status'] == "存在")
         st.write(f"### 檢核結果：已符合 {found_count} 項 / 缺失 {9-found_count} 項")
 
@@ -238,34 +262,42 @@ def main():
                 idx = row * 3 + col
                 item = res[idx]
                 
-                # 狀態顏色
                 status_color = "#2ecc71" if item['status'] == "存在" else "#e74c3c"
                 
+                # 處理建議區塊的 HTML
+                sugg_html = ""
+                if item['suggestion']:
+                    sugg_html = f"""
+                    <div class="suggestion-box">
+                        <b>💡 建議補充：</b><br>
+                        {item['suggestion']}
+                    </div>
+                    """
+
                 with cols[col]:
                     card_html = f"""
                     <div class="flip-card">
                       <div class="flip-card-inner">
                         <div class="flip-card-front">
                           <div style="font-size: 2em; opacity: 0.3; position: absolute; top: 10px; right: 20px;">{item['id']}</div>
-                          <div style="font-size: 1.2em; font-weight: bold;">{item['title']}</div>
+                          <div style="font-size: 1.2em; font-weight: bold; padding: 0 10px;">{item['title']}</div>
                           <div class="status-badge" style="background-color: {status_color};">
                             {item['status']}
                           </div>
-                          <div style="font-size: 0.7em; margin-top: 20px; opacity: 0.8;">(Hover to Flip)</div>
+                          <div style="font-size: 0.75em; margin-top: 20px; opacity: 0.8;">(滑鼠懸停查看詳情)</div>
                         </div>
                         <div class="flip-card-back">
-                          <div style="font-weight: bold; border-bottom: 2px solid {status_color}; width: 100%; margin-bottom: 10px; padding-bottom: 5px;">
-                            內容摘要
+                          <div class="card-title-back" style="border-color: {status_color};">
+                            {item['title']} - 摘要
                           </div>
                           <div class="summary-text">{item['summary']}</div>
-                          {f'<div class="suggestion-box"><b>💡 建議補充：</b><br>{item["suggestion"]}</div>' if item['suggestion'] else ""}
+                          {sugg_html}
                         </div>
                       </div>
                     </div>
                     """
                     st.markdown(card_html, unsafe_allow_html=True)
         
-        # 下載按鈕
         st.download_button(
             label="📥 下載完整 CSV 報告",
             data=st.session_state['df_data'].to_csv(index=False),
@@ -273,7 +305,6 @@ def main():
             mime="text/csv"
         )
     else:
-        # 初始狀態：顯示指引
         st.info("請於左側上傳文件並點擊【開始檢核】按鈕以啟動分析。")
 
 if __name__ == "__main__":
