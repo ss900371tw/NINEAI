@@ -92,7 +92,7 @@ def generalize_feedback(specific_feedback):
     # 1. 先定義 Prompt 內容
     prompt = f"""
     使用者針對醫療 AI 審查提供了具體修正建議：'{specific_feedback}'
-    請將其以純文字轉為通用的審查原則，使其能適用於不同的計畫書。
+    請將其以純文字轉為通用的審查原則，使其能適用於其他不同的計畫書或不同任務模型。
     只回傳轉化後的文字，不要有其他解釋。
     """
     response = model.generate_content(prompt, generation_config={"response_mime_type": "text/plain"})
