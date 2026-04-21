@@ -170,31 +170,49 @@ def cosine_similarity(v1, v2):
     return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
     
     
-def run_full_analysis(item, full_text, rag_df):
-    history = ""
-    if not rag_df.empty and "UserFeedback" in rag_df.columns:
-        # 1. 準備搜尋目標（原則標題 + 定義）
-        query_text = f"{item['title']}: {item['desc']}"
-        query_vec = get_embedding(query_text)
-        
-        # 2. 篩選出同類別的紀錄（縮小比對範圍提高效率）
-        rel_rows = rag_df[rag_df["Principle"] == item["title"]].copy()
-        
-        if not rel_rows.empty:
-            # 3. 計算每一筆回饋的相似度 (這部分若資料量大建議快取 Embedding)
-            # 為了 demo 簡化，假設現場計算
-            similarities = []
-            for fb in rel_rows["UserFeedback"].tolist():
-                fb_vec = get_embedding(fb)
-                similarities.append(cosine_similarity(query_vec, fb_vec))
-            
-            rel_rows["sim"] = similarities
-            
-            # 4. 取 Top 3 相似的回饋
-            top_3 = rel_rows.sort_values(by="sim", ascending=False).head(3)
-            history = "\n".join([f"- {row['UserFeedback']}" for _, row in top_3.iterrows()])
+def run_full_analysis(full_text):
+    """執行完整分析，包含 9+2 個項目"""
+    # 1. 取得歷史 RAG 資料
+    rag_df = get_rag_df_from_github()
+    
+    # 2. 合併所有待檢核項目
+    all_items = TRANSPARENCY_9 + GOVERNANCE_2
+    
+    # 3. 逐項執行分析 (建議使用 ThreadPoolExecutor 加速，或單純迴圈)
+    results_t = []
+    results_g = []
+    
+    # 為了方便示範，使用簡單迴圈
+    for i, item in enumerate(all_items):
+        history = ""
+        # 尋找相似歷史經驗
+        if not rag_df.empty and "UserFeedback" in rag_df.columns:
+            query_text = f"{item['title']}: {item['desc']}"
+            try:
+                query_vec = get_embedding(query_text)
+                rel_rows = rag_df[rag_df["Principle"] == item["title"]].copy()
+                
+                if not rel_rows.empty:
+                    similarities = []
+                    for fb in rel_rows["UserFeedback"].tolist():
+                        fb_vec = get_embedding(fb)
+                        similarities.append(cosine_similarity(query_vec, fb_vec))
+                    
+                    rel_rows["sim"] = similarities
+                    top_3 = rel_rows.sort_values(by="sim", ascending=False).head(3)
+                    history = "\n".join([f"- {row['UserFeedback']}" for _, row in top_3.iterrows()])
+            except Exception as e:
+                st.warning(f"RAG 檢索失敗 ({item['title']}): {e}")
 
-    return analyze_item(item, full_text, rag_history=history)
+        # 呼叫原本的單項分析函式
+        res = analyze_item(item, full_text, rag_history=history)
+        
+        if i < 9:
+            results_t.append(res)
+        else:
+            results_g.append(res)
+            
+    return {"t": results_t, "g": results_g}
 
 
 
