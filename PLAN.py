@@ -92,7 +92,7 @@ def get_rag_df_from_github():
 def generalize_feedback(specific_feedback):
     prompt = f"""
     使用者針對醫療 AI 審查提供了具體修正建議：'{specific_feedback}'
-    請將其轉化為一條『通用的審查原則』，使其能適用於其他不同的計畫書。
+    請以純文字將其轉為一條通用的審查原則，使其能適用於其他不同的計畫書。
     只回傳轉化後的文字，不要有其他解釋。
     """
     response = model.generate_content(prompt)
