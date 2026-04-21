@@ -119,7 +119,6 @@ def update_rag_to_github(timestamp, principle, feedback, original_summary):
         "Timestamp": timestamp,
         "Principle": principle,
         "UserFeedback": feedback,
-        "OriginalSummary": original_summary
     }])
     df = pd.concat([df, new_data], ignore_index=True)
 
