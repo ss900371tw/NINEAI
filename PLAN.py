@@ -48,7 +48,7 @@ SAFETY_SETTINGS = [
 
 # 初始化 Gemini 模型
 model = genai.GenerativeModel(
-    model_name="gemini-1.5-pro", # 建議使用 pro 等級處理複雜邏輯
+    model_name="gemini-2.5-pro", # 建議使用 pro 等級處理複雜邏輯
     generation_config={
         "response_mime_type": "application/json",
         "temperature": 0.1,
