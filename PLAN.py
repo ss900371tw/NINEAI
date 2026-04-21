@@ -101,20 +101,29 @@ def update_rag_to_github(timestamp, principle, feedback, original_summary):
     put_res = requests.put(url, headers=headers, json=payload)
     return put_res.status_code in [200, 201]
 
-def analyze_item(item, context_text):
-    """單項分析邏輯"""
+def analyze_item(item, context_text, rag_context=""):
+    """
+    rag_context: 從 RAG.csv 中檢索出與該原則相關的歷史回饋
+    """
     prompt = f"""
-    你是一位醫療 AI 合規性審查專家。請針對以下原則分析文件內容：
+    你是一位醫療 AI 合規性審查專家。請針對以下原則分析文件內容。
+    
+    【檢核原則】
     原則：{item['title']}
     定義：{item['desc']}
     
-    文件內容：{context_text[:12000]}
+    【歷史修正參考 (RAG)】
+    以下是過去人工審查對類似內容的修正建議，請參考這些經驗進行判斷：
+    {rag_context if rag_context else "尚無歷史參考資料資料。"}
     
-    請以 JSON 格式回覆，不需其他解釋：
+    【文件內容】
+    {context_text[:12000]}
+    
+    請根據上述資訊，以 JSON 格式回覆：
     {{
       "status": "存在" 或 "不存在",
-      "summary": "具體做法摘要（若不存在則寫未見描述）",
-      "suggestion": "缺失建議（若存在則留空）"
+      "summary": "具體做法摘要",
+      "suggestion": "缺失建議"
     }}
     """
     try:
