@@ -157,13 +157,20 @@ def analyze_item(item, context_text, rag_history=""):
 import numpy as np
 
 def get_embedding(text):
-    """將文字轉換為向量"""
-    result = genai.embed_content(
-        model="models/text-embedding-004",
-        content=text,
-        task_type="retrieval_query"
-    )
-    return result['embedding']
+    """將文字轉換為向量 - 修正模型路徑"""
+    try:
+        # 嘗試使用最通用的 embedding 模型名稱
+        result = genai.embed_content(
+            model="models/embedding-001", # 如果 004 不行，001 是穩定首選
+            content=text,
+            task_type="retrieval_query"
+        )
+        return result['embedding']
+    except Exception as e:
+        # 如果還是失敗，拋出錯誤以便調試
+        st.error(f"Embedding 錯誤: {e}")
+        return [0] * 768  # 回傳零向量避免後續計算崩潰
+
 
 def cosine_similarity(v1, v2):
     """計算餘弦相似度"""
