@@ -29,7 +29,7 @@ chroma_client = chromadb.PersistentClient(path=CHROMA_DATA_PATH)
 # 【修正點】使用 Gemini 的 Embedding 模型，請確保名稱正確且前綴包含 models/
 gemini_ef = embedding_functions.GoogleGenerativeAiEmbeddingFunction(
     api_key=GOOGLE_API_KEY,
-    model_name="models/text-embedding-001" 
+    model_name="text-embedding-001" 
 )
 
 # 取得或創建向量集
