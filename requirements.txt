@@ -3,6 +3,12 @@ python-dotenv>=1.0.1
 pandas>=2.2.2
 google
 chromadb
+streamlit
+google-generativeai
+qdrant-client
+pymupdf
+pandas
+python-dotenv
 google-generativeai>=0.4.1
 biom-format>=2.1.13
 langchain>=0.1.16
