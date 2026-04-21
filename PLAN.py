@@ -313,7 +313,7 @@ def main():
                     
                     with st.spinner("同步至 GitHub 中..."):
                         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        if update_rag_to_github(now, selected_title, generalized_comment, orig_sum):
+                        if update_rag_to_github(selected_title, generalized_comment):
                             st.success("回饋成功！下次分析將參考此經驗。")
                         else:
                             st.error("寫入失敗，請確認 Token 權限。")
