@@ -88,12 +88,28 @@ def inject_custom_css():
 
     /* 背面顏色：淺灰白 */
     .flip-card-back {
-      background-color: #ffffff;
-      color: #2c3e50;
-      transform: rotateY(180deg);
-      border: 1px solid #e0e0e0;
-      overflow-y: auto;
-      justify-content: flex-start;
+    background-color: #ffffff;
+    color: #2c3e50;
+    transform: rotateY(180deg);
+    border: 1px solid #e0e0e0;
+  
+    /* 關鍵修正：確保內容垂直排列並從頂部開始 */
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start; 
+  
+    /* 滾動條優化 */
+    overflow-y: auto;
+    padding: 15px;
+    }
+
+    /* 讓滾動條美觀一點，避免遮擋文字 */
+    .flip-card-back::-webkit-scrollbar {
+      width: 4px;
+    }
+    .flip-card-back::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 10px;
     }
 
     .status-badge {
