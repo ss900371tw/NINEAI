@@ -142,7 +142,7 @@ def build_transparency_prompts(principles, full_text, rag_docs_k=3):
 
     for p in principles:
         title, desc = p.split('：', 1)
-        prompt = f"分析文件是否包含「{title}」。要求：{desc}\n\n文件內容：{full_text[:3500]}\n\n回覆格式：\n狀態: 存在/不存在\n摘要: (內容摘要)"
+        prompt = f"分析文件是否包含「{title}」，禁止使用 Markdown 或 HTML。要求：{desc}\n\n文件內容：{full_text[:3500]}\n\n回覆格式：\n狀態: 存在/不存在\n摘要: (內容摘要)"
         prompts.append(prompt)
     return prompts
 
