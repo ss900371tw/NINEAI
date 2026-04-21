@@ -157,20 +157,42 @@ def analyze_item(item, context_text, rag_history=""):
 import numpy as np
 
 def get_embedding(text):
-    """將文字轉換為向量 - 修正模型路徑"""
+    """自動偵測並使用可用的 Embedding 模型"""
     try:
-        # 嘗試使用最通用的 embedding 模型名稱
+        # 1. 取得所有可用模型清單 (快取機制，避免每次都列表)
+        if 'available_embed_model' not in st.session_state:
+            model_list = genai.list_models()
+            embed_models = [m.name for m in model_list if 'embedContent' in m.supported_generation_methods]
+            
+            if not embed_models:
+                st.error("您的 API Key 權限下找不到任何支援 Embedding 的模型。")
+                return [0] * 768
+            
+            # 優先順序：004 > 001 > 其他
+            target = ""
+            for m in embed_models:
+                if "text-embedding-004" in m: target = m; break
+            if not target:
+                for m in embed_models:
+                    if "embedding-001" in m: target = m; break
+            if not target:
+                target = embed_models[0]
+                
+            st.session_state['available_embed_model'] = target
+            st.write(f"系統自動選用模型: `{target}`") # 除錯用，確認後可刪除
+
+        # 2. 執行向量化
         result = genai.embed_content(
-            model="models/embedding-001", # 如果 004 不行，001 是穩定首選
+            model=st.session_state['available_embed_model'],
             content=text,
             task_type="retrieval_query"
         )
         return result['embedding']
+        
     except Exception as e:
-        # 如果還是失敗，拋出錯誤以便調試
-        st.error(f"Embedding 錯誤: {e}")
-        return [0] * 768  # 回傳零向量避免後續計算崩潰
-
+        st.error(f"Embedding 關鍵錯誤: {e}")
+        return [0] * 768
+        
 
 def cosine_similarity(v1, v2):
     """計算餘弦相似度"""
