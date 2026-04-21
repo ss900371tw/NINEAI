@@ -89,6 +89,10 @@ def get_rag_df_from_github():
 
 
 def generalize_feedback(specific_feedback):
+    response = model.generate_content(
+        prompt, 
+        generation_config={"response_mime_type": "text/plain"} 
+    )
     prompt = f"""
     使用者針對醫療 AI 審查提供了具體修正建議：'{specific_feedback}'
     請將其轉為通用的審查原則，使其能適用於不同的計畫書。
@@ -96,19 +100,7 @@ def generalize_feedback(specific_feedback):
     """
     # 這裡我們不改變全域設定，直接處理回傳結果
     response = model.generate_content(prompt)
-    raw_text = response.text.strip()
-
-    # 檢查是否被包裝在 JSON 格式中
-    if raw_text.startswith("{"):
-        try:
-            res_dict = json.loads(raw_text)
-            # AI 通常會用 "review_principle" 或 "output" 作為 Key
-            # 我們取第一個 Value 或是特定的 Key
-            if isinstance(res_dict, dict):
-                return list(res_dict.values())[0] 
-        except Exception:
-            pass # 如果解析失敗，就直接回傳原始文字
-            
+    raw_text = response.text.strip()  
     return raw_text
     
 
