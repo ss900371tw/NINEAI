@@ -116,7 +116,6 @@ def update_rag_to_github(timestamp, principle, feedback, original_summary):
 
     # 2. 加入新列
     new_data = pd.DataFrame([{
-        "Timestamp": timestamp,
         "Principle": principle,
         "UserFeedback": feedback,
     }])
