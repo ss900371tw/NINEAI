@@ -74,8 +74,20 @@ def get_rag_df_from_github():
     res = requests.get(url, headers=headers)
     if res.status_code == 200:
         content = base64.b64decode(res.json()['content']).decode('utf-8')
-        return pd.read_csv(StringIO(content))
+        
+        # --- 核心修正處 ---
+        if not content.strip():  # 如果檔案內容是空的
+            return pd.DataFrame(columns=["Timestamp", "Principle", "UserFeedback", "OriginalSummary"])
+        
+        try:
+            return pd.read_csv(StringIO(content))
+        except pd.errors.EmptyDataError:
+            return pd.DataFrame(columns=["Timestamp", "Principle", "UserFeedback", "OriginalSummary"])
+    
     return pd.DataFrame(columns=["Timestamp", "Principle", "UserFeedback", "OriginalSummary"])
+
+
+
 
 def update_rag_to_github(timestamp, principle, feedback, original_summary):
     """將回饋存入 GitHub"""
