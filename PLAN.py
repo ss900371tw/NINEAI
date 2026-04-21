@@ -238,7 +238,7 @@ def main():
         pdf_file = st.file_uploader("上傳計畫書 PDF", type="pdf")
         btn = st.button("🚀 開始分析", use_container_width=True)
         st.divider()
-        st.info(f"RAG 庫路徑: {REPO_OWNER}/{REPO_NAME}/{FILE_PATH}")
+        st.info("您的回饋建議將存入 AI 知識庫，用於強化未來分析結果。")
 
     if pdf_file and btn:
         with st.spinner("正在讀取檔案並檢索歷史經驗..."):
