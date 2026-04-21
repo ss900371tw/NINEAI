@@ -14,7 +14,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # 使用 Gemini 模型
-model = genai.GenerativeModel("gemini-1.5-flash") # 建議使用 flash 速度較快，或維持您的 gemini-3-pro-preview
+model = genai.GenerativeModel("gemini-2.5-pro") # 建議使用 flash 速度較快，或維持您的 gemini-3-pro-preview
 
 # FAISS 向量庫初始化
 INDEX_FILE_PATH = "faiss_index"
