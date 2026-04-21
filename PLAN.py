@@ -89,6 +89,20 @@ def get_rag_df_from_github():
 
 
 
+def generalize_feedback(specific_feedback):
+    prompt = f"""
+    使用者針對醫療 AI 審查提供了具體修正建議：'{specific_feedback}'
+    請將其轉化為一條『通用的審查原則』，使其能適用於其他不同的計畫書。
+    只回傳轉化後的文字，不要有其他解釋。
+    """
+    response = model.generate_content(prompt)
+    return response.text.strip()
+
+
+    
+
+
+
 
 def update_rag_to_github(timestamp, principle, feedback, original_summary):
     """將回饋存入 GitHub"""
@@ -286,9 +300,9 @@ def main():
             with col1:
                 selected_title = st.selectbox("選擇要修正的項目", all_titles)
             with col2:
-                user_comment = st.text_area("修正建議 (AI 哪裡看錯了？)", placeholder="例如：第4頁其實有提到數據來源是北醫...")
-            
+                user_comment = st.text_area("修正建議 (AI 哪裡看錯了？)", placeholder="例如：『應加強對表格內數據的識別』或『此類資訊通常出現在附件的技術規格中』")
             submit_rag = st.form_submit_button("✅ 送出經驗並優化未來分析")
+            generalized_comment = generalize_feedback(user_comment)
 
             if submit_rag:
                 if not GITHUB_TOKEN:
@@ -302,7 +316,7 @@ def main():
                     
                     with st.spinner("同步至 GitHub 中..."):
                         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        if update_rag_to_github(now, selected_title, user_comment, orig_sum):
+                        if update_rag_to_github(now, selected_title, generalized_comment, orig_sum):
                             st.success("回饋成功！下次分析將參考此經驗。")
                         else:
                             st.error("寫入失敗，請確認 Token 權限。")
