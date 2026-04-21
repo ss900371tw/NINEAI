@@ -211,7 +211,6 @@ def main():
                       {suggestion_html}
                     </div>
                   </div>
-                </div>
                 """
                 with cols[col]:
                     st.markdown(card_html, unsafe_allow_html=True)
