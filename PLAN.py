@@ -78,14 +78,14 @@ def get_rag_df_from_github():
         
         # --- 核心修正處 ---
         if not content.strip():  # 如果檔案內容是空的
-            return pd.DataFrame(columns=["Timestamp", "Principle", "UserFeedback", "OriginalSummary"])
+            return pd.DataFrame(columns=["Principle", "UserFeedback"])
         
         try:
             return pd.read_csv(StringIO(content))
         except pd.errors.EmptyDataError:
-            return pd.DataFrame(columns=["Timestamp", "Principle", "UserFeedback", "OriginalSummary"])
+            return pd.DataFrame(columns=["Principle", "UserFeedback"])
     
-    return pd.DataFrame(columns=["Timestamp", "Principle", "UserFeedback", "OriginalSummary"])
+    return pd.DataFrame(columns=["Principle", "UserFeedback"])
 
 
 
@@ -104,7 +104,7 @@ def generalize_feedback(specific_feedback):
 
 
 
-def update_rag_to_github(timestamp, principle, feedback, original_summary):
+def update_rag_to_github(principle, feedback):
     """將回饋存入 GitHub"""
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
