@@ -188,40 +188,49 @@ def cosine_similarity(v1, v2):
     
     
 def run_full_analysis(full_text):
-    """執行完整分析，包含 9+2 個項目"""
+    """執行二階段 RAG 分析"""
     # 1. 取得歷史 RAG 資料
     rag_df = get_rag_df_from_github()
-    
-    # 2. 合併所有待檢核項目
     all_items = TRANSPARENCY_9 + GOVERNANCE_2
     
-    # 3. 逐項執行分析 (建議使用 ThreadPoolExecutor 加速，或單純迴圈)
     results_t = []
     results_g = []
     
-    # 為了方便示範，使用簡單迴圈
+    # 預先對 PDF 內容做 Embedding（取前 2000 字作為上下文代表，或切片處理）
+    # 這裡建議取計畫書開頭，通常包含研究目標與方法
+    pdf_context = full_text[:2000]
+    try:
+        pdf_vec = get_embedding(pdf_context)
+    except:
+        pdf_vec = None
+
     for i, item in enumerate(all_items):
         history = ""
-        # 尋找相似歷史經驗
+        
+        # --- 方案 B：二階段檢索開始 ---
         if not rag_df.empty and "UserFeedback" in rag_df.columns:
-            query_text = f"{item['title']}: {item['desc']}"
-            try:
-                query_vec = get_embedding(query_text)
-                rel_rows = rag_df[rag_df["Principle"] == item["title"]].copy()
-                
-                if not rel_rows.empty:
-                    similarities = []
-                    for fb in rel_rows["UserFeedback"].tolist():
+            # 第一階段：硬性篩選（只找標題完全相符的經驗）
+            rel_rows = rag_df[rag_df["Principle"] == item["title"]].copy()
+            
+            if not rel_rows.empty and pdf_vec is not None:
+                similarities = []
+                # 第二階段：語義篩選（計算歷史建議與「當前 PDF 內容」的相似度）
+                for fb in rel_rows["UserFeedback"].tolist():
+                    try:
                         fb_vec = get_embedding(fb)
-                        similarities.append(cosine_similarity(query_vec, fb_vec))
-                    
-                    rel_rows["sim"] = similarities
-                    top_3 = rel_rows.sort_values(by="sim", ascending=False).head(3)
-                    history = "\n".join([f"- {row['UserFeedback']}" for _, row in top_3.iterrows()])
-            except Exception as e:
-                st.warning(f"RAG 檢索失敗 ({item['title']}): {e}")
+                        # 計算 PDF 內容與歷史回饋的相關性
+                        sim = cosine_similarity(pdf_vec, fb_vec)
+                        similarities.append(sim)
+                    except:
+                        similarities.append(0)
+                
+                rel_rows["sim"] = similarities
+                # 取得最符合當前 PDF 情境的前 3 筆經驗
+                top_3 = rel_rows.sort_values(by="sim", ascending=False).head(3)
+                history = "\n".join([f"- {row['UserFeedback']}" for _, row in top_3.iterrows()])
+        # --- 方案 B：二階段檢索結束 ---
 
-        # 呼叫原本的單項分析函式
+        # 執行 AI 分析
         res = analyze_item(item, full_text, rag_history=history)
         
         if i < 9:
