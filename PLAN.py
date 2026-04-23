@@ -160,9 +160,9 @@ def update_rag_to_github(principle, feedback):
     }])
     df = pd.concat([df, new_data], ignore_index=True)
     csv_content = df.to_csv(
-        index=False, 
-        encoding='utf-8', 
-        quoting=csv.QUOTE_ALL, 
+        index=False,
+        encoding='utf-8',
+        quoting=csv.QUOTE_ALL,
         quotechar='"'
     )
     encoded_content = base64.b64encode(csv_content.encode('utf-8')).decode('utf-8')
