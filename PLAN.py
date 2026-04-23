@@ -139,57 +139,39 @@ def get_rag_df_from_github():
                 on_bad_lines='skip',
                 engine='python'
             )
-        else:
-            return pd.DataFrame(columns=["Principle", "UserFeedback"])
-            
-    except Exception as e:
-        # 如果發生 ParserError，回傳空表讓程式繼續執行，並提示用戶
-        st.warning(f"RAG 庫格式受損，已自動重置。錯誤詳情: {e}")
-        return pd.DataFrame(columns=["Principle", "UserFeedback"])
+        else:
+            return pd.DataFrame(columns=["Principle", "UserFeedback"])
+    except Exception as e:
+        st.warning(f"RAG 庫格式受損，已自動重置。錯誤詳情: {e}")
+        return pd.DataFrame(columns=["Principle", "UserFeedback"])
 
 
 def update_rag_to_github(principle, feedback):
-    """將回饋存入 GitHub，強制執行格式標準化"""
-    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+    df = get_rag_df_from_github()
+    res = requests.get(url, headers=headers)
+    sha = res.json().get('sha') if res.status_code == 200 else None
 
-    # 1. 取得現有資料 (已包含錯誤處理)
-    df = get_rag_df_from_github()
-    
-    # 再次確認 SHA
-    res = requests.get(url, headers=headers)
-    sha = res.json().get('sha') if res.status_code == 200 else None
-
-    # 2. 清理 Feedback 內容：移除所有可能干擾 CSV 的字元
-    # 移除雙引號避免嵌套錯誤，並統一換行符號
-    clean_feedback = str(feedback).replace('"', "'").replace('\n', ' ').strip()
-
-    # 3. 加入新列
-    new_data = pd.DataFrame([{
-        "Principle": principle,
-        "UserFeedback": clean_feedback,
-    }])
-    
-    df = pd.concat([df, new_data], ignore_index=True)
-
-    # 4. 轉回 CSV：強制對所有欄位加引號，確保解析安全
-    csv_content = df.to_csv(
-        index=False, 
-        encoding='utf-8', 
-        quoting=csv.QUOTE_ALL, 
-        quotechar='"'
-    )
-    
-    encoded_content = base64.b64encode(csv_content.encode('utf-8')).decode('utf-8')
-    
-    payload = {
-        "message": f"Fix & Update RAG feedback for {principle}",
-        "content": encoded_content,
-        "sha": sha
-    }
-    
-    put_res = requests.put(url, headers=headers, json=payload)
-    return put_res.status_code in [200, 201]
+    clean_feedback = str(feedback).replace('"', "'").replace('\n', ' ').strip()
+    new_data = pd.DataFrame([{
+        "Principle": principle,
+        "UserFeedback": clean_feedback,
+    }])
+    df = pd.concat([df, new_data], ignore_index=True)
+    csv_content = df.to_csv(
+        index=False, 
+        encoding='utf-8', 
+        quoting=csv.QUOTE_ALL, 
+        quotechar='"'
+    )
+    encoded_content = base64.b64encode(csv_content.encode('utf-8')).decode('utf-8')
+    payload = {
+        "message": f"Fix & Update RAG feedback for {principle}",
+        "content": encoded_content,
+        "sha": sha}
+    put_res = requests.put(url, headers=headers, json=payload)
+    return put_res.status_code in [200, 201]
 
 
 
