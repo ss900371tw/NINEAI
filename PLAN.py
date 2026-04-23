@@ -71,18 +71,28 @@ import csv
 from google.cloud import vision
 
 def perform_google_ocr(pdf_file_bytes):
-    """使用 Google Cloud Vision API 進行掃描檔辨識"""
-    client = vision.ImageAnnotatorClient()
+    """使用 Google Cloud Vision API 進行掃描檔辨識 (從 Streamlit Secrets 讀取憑證)"""
+    from google.oauth2 import service_account
     
-    # 將 PDF 位元組轉換為 Vision API 格式
-    # 這裡建議將 PDF 轉為圖片處理，或使用 Vision API 的 async_batch_annotate_files (針對 PDF)
-    # 為了流程簡單且快速，我們維持單頁處理或轉圖片辨識
-    
+    # --- 修改處：從 st.secrets 取得憑證資訊 ---
+    try:
+        if "gcp_service_account" in st.secrets:
+            creds_info = st.secrets["gcp_service_account"]
+            credentials = service_account.Credentials.from_service_account_info(creds_info)
+            client = vision.ImageAnnotatorClient(credentials=credentials)
+        else:
+            st.error("找不到名為 'gcp_service_account' 的 Secrets 設定。")
+            return ""
+    except Exception as e:
+        st.error(f"初始化 Google Cloud Vision 失敗: {e}")
+        return ""
+    # ---------------------------------------
+
     doc = fitz.open(stream=pdf_file_bytes, filetype="pdf")
     full_text = ""
     
     for page in doc:
-        # 將頁面渲染為圖片 (300 DPI)
+        # 將頁面渲染為圖片 (2.0 矩陣約為 144 DPI，若要更精準可用 3, 3)
         pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
         img_bytes = pix.tobytes("png")
         
@@ -90,6 +100,7 @@ def perform_google_ocr(pdf_file_bytes):
         response = client.text_detection(image=image)
         
         if response.text_annotations:
+            # text_annotations[0] 包含該頁面的完整辨識文字
             full_text += response.text_annotations[0].description + "\n"
             
     return full_text
