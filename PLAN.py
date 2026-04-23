@@ -117,7 +117,7 @@ def get_smart_text(pdf_file_bytes):
 def get_rag_df_from_github():
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
     headers = {
-        "Authorization": f"token {GITHUB_TOKEN}", 
+        "Authorization": f"token {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json",
         "Cache-Control": "no-cache"
     }
