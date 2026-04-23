@@ -7,7 +7,6 @@ PyMuPDF
 google-cloud-vision
 google-auth
 pandas
-io
 google-generativeai
 python-dotenv
 requests
