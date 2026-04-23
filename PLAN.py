@@ -301,25 +301,25 @@ def main():
         st.info("您的回饋建議將存入 AI 知識庫，用於強化未來分析結果。")
 
     if pdf_files and btn:
-    all_pdf_results = {} # 用於儲存所有檔案的結果
+        all_pdf_results = {} # 用於儲存所有檔案的結果
     
-    # 建立進度條
-    progress_bar = st.progress(0)
+        # 建立進度條
+        progress_bar = st.progress(0)
     
-    for i, pdf_file in enumerate(pdf_files):
-        with st.spinner(f"正在分析 ({i+1}/{len(pdf_files)}): {pdf_file.name}"):
-            # 讀取 PDF
-            doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
-            full_text = "\n".join([page.get_text() for page in doc])
+        for i, pdf_file in enumerate(pdf_files):
+            with st.spinner(f"正在分析 ({i+1}/{len(pdf_files)}): {pdf_file.name}"):
+                # 讀取 PDF
+                doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+                full_text = "\n".join([page.get_text() for page in doc])
             
-            # 執行原本的分析函式
-            results = run_full_analysis(full_text)
-            all_pdf_results[pdf_file.name] = results
+                # 執行原本的分析函式
+                results = run_full_analysis(full_text)
+                all_pdf_results[pdf_file.name] = results
             
-        progress_bar.progress((i + 1) / len(pdf_files))
+            progress_bar.progress((i + 1) / len(pdf_files))
     
-    st.session_state['batch_results'] = all_pdf_results
-    st.success("所有檔案分析完成！")
+        st.session_state['batch_results'] = all_pdf_results
+        st.success("所有檔案分析完成！")
 
     # 顯示結果
     if st.session_state['res_t']:
