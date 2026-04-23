@@ -223,7 +223,7 @@ def convert_all_results_to_xlsx():
 
 def main():
     st.set_page_config(page_title="醫療 AI 治理檢核", layout="wide")
-    st.title("🛡️ 負責任 AI 自動檢核系統 (批次強化版)")
+    st.title("🛡️ 負責任 AI 自動檢核系統")
 
     # 初始化批次結果存儲
     if 'batch_results' not in st.session_state:
@@ -252,8 +252,11 @@ def main():
         for idx, pdf_file in enumerate(pdf_files):
             with st.status(f"正在分析 ({idx+1}/{len(pdf_files)}): {pdf_file.name}...") as status:
                 doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+                st.write("🔍 正在從 PDF 提取文字...")
                 full_text = "\n".join([page.get_text() for page in doc])
+                st.write("🧠 正在呼叫 Gemini Pro 進行合規性審查...")
                 results = run_full_analysis(full_text)
+                st.write("📊 正在彙整分析結果...")
                 st.session_state['batch_results'][pdf_file.name] = results
                 status.update(label=f"✅ {pdf_file.name} 分析完成", state="complete")
             progress_bar.progress((idx + 1) / len(pdf_files))
