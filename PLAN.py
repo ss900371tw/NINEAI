@@ -225,42 +225,47 @@ def main():
     st.set_page_config(page_title="醫療 AI 治理檢核", layout="wide")
     st.title("🛡️ 負責任 AI 自動檢核系統")
 
-    # 初始化批次結果存儲
+    # 1. 初始化 session_state
     if 'batch_results' not in st.session_state:
         st.session_state['batch_results'] = {}
+    if 'analysis_done' not in st.session_state:
+        st.session_state['analysis_done'] = False
 
     with st.sidebar:
         st.header("1. 檔案讀取")
         pdf_files = st.file_uploader("上傳多份計畫書 PDF", type="pdf", accept_multiple_files=True)
         btn = st.button("🚀 開始批次分析", use_container_width=True)
         st.divider()
-        # 側邊欄保留下載按鈕作為快速入口
 
-
+    # 2. 執行分析邏輯 (僅在點擊按鈕時觸發)
     if pdf_files and btn:
-        st.session_state['batch_results'] = {} # 清空舊結果
+        st.session_state['batch_results'] = {} 
+        st.session_state['analysis_done'] = False
+        
         progress_bar = st.progress(0)
         
         for idx, pdf_file in enumerate(pdf_files):
+            # 使用 status 顯示當前進度，完成後它會停留在頁面直到下一次互動
             with st.status(f"正在分析 ({idx+1}/{len(pdf_files)}): {pdf_file.name}...") as status:
-                # 建立一個空容器，用來動態更新文字
                 log_placeholder = st.empty()
+                
+                # 讀取 PDF
                 doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
                 full_text = "\n".join([page.get_text() for page in doc])
-        
-                # 步驟 2 (內容會直接覆蓋掉上面的文字)
+                
                 log_placeholder.markdown("🧠 正在呼叫 Gemini Pro 進行合規性審查...")
                 results = run_full_analysis(full_text)
-        
-                # 步驟 3
+                
                 log_placeholder.markdown("📊 正在彙整分析結果...")
                 st.session_state['batch_results'][pdf_file.name] = results
-        
-                # 完成後，如果不想要裡面留著最後一行字，甚至可以呼叫 log_placeholder.empty() 清空
+                
                 status.update(label=f"✅ {pdf_file.name} 分析完成", state="complete")
                 progress_bar.progress((idx + 1) / len(pdf_files))
+        
+        st.session_state['analysis_done'] = True
+        st.rerun() # 強制重新整理一次，讓 status 消失，轉向顯示持久化的結果
 
-    # 顯示結果 (使用 Tabs 區分不同檔案)
+    # 3. 顯示結果 (這部分獨立於 st.status，因此按下載不會消失)
     if st.session_state['batch_results']:
         file_names = list(st.session_state['batch_results'].keys())
         
@@ -277,7 +282,6 @@ def main():
                 use_container_width=True,
                 key="main_download"
             )
-            st.write("---")
 
         tabs = st.tabs(file_names)
         
