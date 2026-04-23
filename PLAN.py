@@ -67,30 +67,26 @@ GOVERNANCE_2 = [
 # ---------- 3. 功能函式 ----------
 
 def get_rag_df_from_github():
+    """從 GitHub 讀取目前的 RAG 庫"""
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-    res = requests.get(url, headers=headers)
     
+    res = requests.get(url, headers=headers)
     if res.status_code == 200:
         content = base64.b64decode(res.json()['content']).decode('utf-8')
         
-        # 檢查是否為空的或只有換行
-        if not content.strip():
+        # --- 核心修正處 ---
+        if not content.strip():  # 如果檔案內容是空的
             return pd.DataFrame(columns=["Principle", "UserFeedback"])
         
-        # 檢查是否意外抓到 HTML (例如 404 頁面)
-        if content.strip().startswith("<!DOCTYPE"):
-            st.error("GitHub 回傳了 HTML 而非 CSV，請檢查 FILE_PATH 或權限。")
-            return pd.DataFrame(columns=["Principle", "UserFeedback"])
-
         try:
-            # 加入 on_bad_lines='skip' 避免單一損壞行導致整個 App 崩潰
-            return pd.read_csv(StringIO(content), on_bad_lines='skip')
-        except Exception as e:
-            st.warning(f"解析 CSV 失敗: {e}")
+            return pd.read_csv(StringIO(content))
+        except pd.errors.EmptyDataError:
             return pd.DataFrame(columns=["Principle", "UserFeedback"])
-            
+    
     return pd.DataFrame(columns=["Principle", "UserFeedback"])
+
+
 
 def generalize_feedback(specific_feedback):
     prompt = f"""
@@ -101,19 +97,40 @@ def generalize_feedback(specific_feedback):
     response = model.generate_content(prompt, generation_config={"response_mime_type": "text/plain"})
     return response.text.strip()     
 
+
+
 def update_rag_to_github(principle, feedback):
+    """將回饋存入 GitHub"""
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+
+    # 1. 取得現有資料
     df = get_rag_df_from_github()
     res = requests.get(url, headers=headers)
     sha = res.json().get('sha') if res.status_code == 200 else None
-    new_data = pd.DataFrame([{"Principle": principle, "UserFeedback": feedback}])
+
+    # 2. 加入新列
+    new_data = pd.DataFrame([{
+        "Principle": principle,
+        "UserFeedback": feedback,
+    }])
     df = pd.concat([df, new_data], ignore_index=True)
+
+    # 3. 轉回 CSV 並推送到 GitHub (使用 pandas 確保格式正確)
     csv_content = df.to_csv(index=False, encoding='utf-8')
     encoded_content = base64.b64encode(csv_content.encode('utf-8')).decode('utf-8')
-    payload = {"message": f"Update RAG feedback for {principle}", "content": encoded_content, "sha": sha}
+    
+    payload = {
+        "message": f"Update RAG feedback for {principle}",
+        "content": encoded_content,
+        "sha": sha
+    }
+    
     put_res = requests.put(url, headers=headers, json=payload)
     return put_res.status_code in [200, 201]
+
+
+
 
 def analyze_item(item, context_text, rag_history=""):
     prompt = f"""
