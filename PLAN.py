@@ -107,7 +107,6 @@ def perform_google_ocr(pdf_file_bytes):
         return ""
 
 def get_smart_text(pdf_file_bytes):
-    """智慧判斷：若原生文字太少則啟動 OCR"""
     doc = fitz.open(stream=pdf_file_bytes, filetype="pdf")
     native_text = "\n".join([page.get_text() for page in doc])
     
