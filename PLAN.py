@@ -131,7 +131,7 @@ def get_rag_df_from_github():
             
             # 核心修正：使用更嚴格的解析參數
             return pd.read_csv(
-                io.StringIO(content), 
+                StringIO(content), 
                 sep=',',
                 quotechar='"',          # 指定引號字元
                 doublequote=True,       # 允許雙引號轉義
