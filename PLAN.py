@@ -346,46 +346,49 @@ def main():
         btn = st.button("🚀 開始批次分析", use_container_width=True, key="start_analysis_btn")
         st.divider()
 
+    status_container = st.empty()
     # 2. 執行分析邏輯 (僅在點擊按鈕時觸發)
     if pdf_files and btn:
         st.session_state['batch_results'] = {} 
         st.session_state['analysis_done'] = False
-        progress_bar = st.progress(0)
-        for idx, pdf_file in enumerate(pdf_files):
-            with st.status(f"正在分析: {pdf_file.name}", expanded=True) as status:
-                info_text = st.empty() # 動態文字佔位
+        with status_container.container():
+            progress_bar = st.progress(0)
+            for idx, pdf_file in enumerate(pdf_files):
+                with st.status(f"正在分析: {pdf_file.name}", expanded=True) as status:
+                    info_text = st.empty() # 動態文字佔位
                 
-                # --- 步驟 1: 讀取與智慧文字擷取 ---
-                info_text.markdown("🔍 **步驟 1:** 正在偵測文件格式...")
-                pdf_bytes = pdf_file.read()
+                    # --- 步驟 1: 讀取與智慧文字擷取 ---
+                    info_text.markdown("🔍 **步驟 1:** 正在偵測文件格式...")
+                    pdf_bytes = pdf_file.read()
                 
-                # 這裡調用 get_smart_text，並根據內容長度給予 OCR 提示
-                doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-                native_text = "\n".join([page.get_text() for page in doc])
+                    # 這裡調用 get_smart_text，並根據內容長度給予 OCR 提示
+                    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+                    native_text = "\n".join([page.get_text() for page in doc])
                 
-                if len(native_text.strip()) < 100:
-                    info_text.markdown("📷 **偵測為掃描檔，正在啟動 Google Cloud Vision OCR 辨識...** (這可能需要較長時間)")
-                    full_text = perform_google_ocr(pdf_bytes)
-                else:
-                    info_text.markdown("📄 **偵測為原生文字 PDF，直接擷取內容...**")
-                    full_text = native_text
+                    if len(native_text.strip()) < 100:
+                        info_text.markdown("📷 **偵測為掃描檔，正在啟動 Google Cloud Vision OCR 辨識...** (這可能需要較長時間)")
+                        full_text = perform_google_ocr(pdf_bytes)
+                    else:
+                        info_text.markdown("📄 **偵測為原生文字 PDF，直接擷取內容...**")
+                        full_text = native_text
                 
-                # --- 步驟 2: AI 分析 ---
-                info_text.markdown("🧠 **步驟 2:** 正在呼叫 Gemini 2.5 Pro 進行合規性審查...")
-                results = run_full_analysis(full_text)
+                    # --- 步驟 2: AI 分析 ---
+                    info_text.markdown("🧠 **正在呼叫 Gemini 2.5 Pro 進行合規性審查...**")
+                    results = run_full_analysis(full_text)
                 
-                # --- 步驟 3: 彙整 ---
-                info_text.markdown("📊 **步驟 3:** 正在彙整分析結果...")
-                st.session_state['batch_results'][pdf_file.name] = results
+                    # --- 步驟 3: 彙整 ---
+                    info_text.markdown("📊 **彙整分析結果...**")
+                    st.session_state['batch_results'][pdf_file.name] = results
                 
-                # 完成更新
-                status.update(label=f"✅ {pdf_file.name} 分析完成", state="complete", expanded=False)
-                progress_bar.progress((idx + 1) / len(pdf_files))
-        
-        st.session_state['analysis_done'] = True
-        # 這裡不需要 rerun，Streamlit 偵測到 state 改變會自動更新
+                    # 完成更新
+                    status.update(label=f"✅ {pdf_file.name} 分析完成", state="complete", expanded=False)
+                    progress_bar.progress((idx + 1) / len(pdf_files))
+            
+            st.session_state['analysis_done'] = True
+            # 分析完全結束後，清空這個容器，狀態列就會消失
+            status_container.empty() 
 
-    # 3. 顯示結果 (這部分保持你原本的顯示邏輯)
+    # 3. 顯示結果 (此處會緊接著狀態列消失後出現)
     if st.session_state['batch_results']:
         file_names = list(st.session_state['batch_results'].keys())
         
