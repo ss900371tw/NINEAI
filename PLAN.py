@@ -25,7 +25,7 @@ FILE_PATH = "RAG.csv"
 
 if not GOOGLE_API_KEY:
     st.error("請在 .env 檔案中設定 GOOGLE_API_KEY")
-    st.stop()
+    st.stop()
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
