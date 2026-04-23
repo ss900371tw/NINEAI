@@ -68,54 +68,62 @@ GOVERNANCE_2 = [
 
 import csv
 
+import csv
+import io
+
 def get_rag_df_from_github():
     """從 GitHub 讀取目前的 RAG 庫，增加強健性處理"""
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}", 
         "Accept": "application/vnd.github.v3+json",
-        "Cache-Control": "no-cache" # 避免抓到舊的快取內容
+        "Cache-Control": "no-cache"
     }
     
     try:
         res = requests.get(url, headers=headers)
         if res.status_code == 200:
             file_json = res.json()
-            content = base64.b64decode(file_json['content']).decode('utf-8-sig') # 使用 utf-8-sig 處理可能存在的 BOM
+            # 使用 utf-8 讀取並過濾掉可能導致問題的 null bytes
+            content = base64.b64decode(file_json['content']).decode('utf-8').replace('\x00', '')
             
             if not content.strip(): 
                 return pd.DataFrame(columns=["Principle", "UserFeedback"])
             
-            # 使用 StringIO 讀取，並顯式指定 quoting 規則
+            # 核心修正：使用更嚴格的解析參數
             return pd.read_csv(
-                StringIO(content), 
-                quoting=csv.QUOTE_MINIMAL, 
-                on_bad_lines='warn' # 如果遇到壞行，跳過並警告而不是崩潰
+                io.StringIO(content), 
+                sep=',',
+                quotechar='"',          # 指定引號字元
+                doublequote=True,       # 允許雙引號轉義
+                escapechar='\\',        # 增加逃逸字元處理
+                on_bad_lines='skip',    # 遇到毀損行直接跳過，確保程式不崩潰
+                engine='python'         # Python 引擎對損壞檔案的容忍度較高
             )
         else:
-            # 檔案不存在或其他錯誤，回傳空表
             return pd.DataFrame(columns=["Principle", "UserFeedback"])
             
     except Exception as e:
-        st.error(f"讀取 RAG 庫時發生解析錯誤: {e}")
+        # 如果發生 ParserError，回傳空表讓程式繼續執行，並提示用戶
+        st.warning(f"RAG 庫格式受損，已自動重置。錯誤詳情: {e}")
         return pd.DataFrame(columns=["Principle", "UserFeedback"])
 
 
 def update_rag_to_github(principle, feedback):
-    """將回饋存入 GitHub，強化換行符號處理"""
+    """將回饋存入 GitHub，強制執行格式標準化"""
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
 
-    # 1. 取得現有資料
+    # 1. 取得現有資料 (已包含錯誤處理)
     df = get_rag_df_from_github()
     
-    # 取得最新的 SHA 才能更新
+    # 再次確認 SHA
     res = requests.get(url, headers=headers)
     sha = res.json().get('sha') if res.status_code == 200 else None
 
-    # 2. 清理回饋內容：移除可能導致 CSV 混亂的異常字元（可選）
-    # 這裡確保 feedback 是字串且處理換行
-    clean_feedback = str(feedback).replace('\r', '') 
+    # 2. 清理 Feedback 內容：移除所有可能干擾 CSV 的字元
+    # 移除雙引號避免嵌套錯誤，並統一換行符號
+    clean_feedback = str(feedback).replace('"', "'").replace('\n', ' ').strip()
 
     # 3. 加入新列
     new_data = pd.DataFrame([{
@@ -123,26 +131,25 @@ def update_rag_to_github(principle, feedback):
         "UserFeedback": clean_feedback,
     }])
     
-    # 確保不會因為 concat 產生全空的欄位
-    df = pd.concat([df, new_data], ignore_index=True).dropna(how='all')
+    df = pd.concat([df, new_data], ignore_index=True)
 
-    # 4. 轉回 CSV 並推送到 GitHub 
-    # quoting=csv.QUOTE_ALL 會幫所有欄位加上引號，最保險
-    csv_content = df.to_csv(index=False, encoding='utf-8-sig', quoting=csv.QUOTE_ALL)
+    # 4. 轉回 CSV：強制對所有欄位加引號，確保解析安全
+    csv_content = df.to_csv(
+        index=False, 
+        encoding='utf-8', 
+        quoting=csv.QUOTE_ALL, 
+        quotechar='"'
+    )
+    
     encoded_content = base64.b64encode(csv_content.encode('utf-8')).decode('utf-8')
     
     payload = {
-        "message": f"Update RAG feedback for {principle}",
+        "message": f"Fix & Update RAG feedback for {principle}",
         "content": encoded_content,
         "sha": sha
     }
     
     put_res = requests.put(url, headers=headers, json=payload)
-    
-    # 偵錯用：如果失敗列印出狀態
-    if put_res.status_code not in [200, 201]:
-        st.error(f"GitHub 更新失敗: {put_res.json().get('message')}")
-        
     return put_res.status_code in [200, 201]
 
 
