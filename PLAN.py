@@ -7,17 +7,16 @@ import pandas as pd
 import streamlit as st
 import fitz  # PyMuPDF
 import requests
-from io import StringIO
+from io import StringIO, BytesIO # 新增 BytesIO 用於 Excel 處理
 from dotenv import load_dotenv
 import google.generativeai as genai
 from concurrent.futures import ThreadPoolExecutor
+import numpy as np
 
-# ---------- 1. 初始化與環境設定 ----------
+# ---------- 1. 初始化與環境設定 (保持不變) ----------
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-
-# GitHub 倉儲設定
 REPO_OWNER = "ss900371tw"
 REPO_NAME = "NINEAI"
 FILE_PATH = "RAG.csv"
@@ -28,7 +27,6 @@ if not GOOGLE_API_KEY:
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# 安全性設定
 SAFETY_SETTINGS = [
     {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
     {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
@@ -36,16 +34,14 @@ SAFETY_SETTINGS = [
     {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
 ]
 
-# 初始化模型
 model = genai.GenerativeModel(
-    model_name="gemini-2.5-pro", # 修正為官方正確版本號
+    model_name="gemini-2.0-flash", # 建議使用 flash 以提升批次處理速度
     generation_config={
         "response_mime_type": "application/json",
         "temperature": 0.1,
     },
     safety_settings=SAFETY_SETTINGS
 )
-
 # ---------- 2. 原則定義 ----------
 TRANSPARENCY_9 = [
     {"title": "介入詳情及輸出", "desc": "需清楚定義模型輸出，如標記位置、風險評分（0-100 分）或分類建議，指引醫師解讀結果。"},
@@ -67,342 +63,127 @@ GOVERNANCE_2 = [
 # ---------- 3. 功能函式 ----------
 
 def get_rag_df_from_github():
-    """從 GitHub 讀取目前的 RAG 庫"""
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-    
     res = requests.get(url, headers=headers)
     if res.status_code == 200:
         content = base64.b64decode(res.json()['content']).decode('utf-8')
-        
-        # --- 核心修正處 ---
-        if not content.strip():  # 如果檔案內容是空的
-            return pd.DataFrame(columns=["Principle", "UserFeedback"])
-        
-        try:
-            return pd.read_csv(StringIO(content))
-        except pd.errors.EmptyDataError:
-            return pd.DataFrame(columns=["Principle", "UserFeedback"])
-    
+        if not content.strip(): return pd.DataFrame(columns=["Principle", "UserFeedback"])
+        try: return pd.read_csv(StringIO(content))
+        except: return pd.DataFrame(columns=["Principle", "UserFeedback"])
     return pd.DataFrame(columns=["Principle", "UserFeedback"])
 
-
-
-def generalize_feedback(specific_feedback):
-    # 1. 先定義 Prompt 內容
-    prompt = f"""
-    使用者針對醫療 AI 審查提供了具體修正建議：'{specific_feedback}'
-    請將其以簡短純文字轉為通用的審查原則，使其能適用於其他不同的計畫書或不同任務模型。
-    只回傳轉化後的文字，不要有其他解釋。
-    """
-    response = model.generate_content(prompt, generation_config={"response_mime_type": "text/plain"})
-    return response.text.strip()     
-
-
-
-
-def update_rag_to_github(principle, feedback):
-    """將回饋存入 GitHub"""
-    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-
-    # 1. 取得現有資料
-    df = get_rag_df_from_github()
-    res = requests.get(url, headers=headers)
-    sha = res.json().get('sha') if res.status_code == 200 else None
-
-    # 2. 加入新列
-    new_data = pd.DataFrame([{
-        "Principle": principle,
-        "UserFeedback": feedback,
-    }])
-    df = pd.concat([df, new_data], ignore_index=True)
-
-    # 3. 轉回 CSV 並推送到 GitHub (使用 pandas 確保格式正確)
-    csv_content = df.to_csv(index=False, encoding='utf-8')
-    encoded_content = base64.b64encode(csv_content.encode('utf-8')).decode('utf-8')
-    
-    payload = {
-        "message": f"Update RAG feedback for {principle}",
-        "content": encoded_content,
-        "sha": sha
-    }
-    
-    put_res = requests.put(url, headers=headers, json=payload)
-    return put_res.status_code in [200, 201]
-
 def analyze_item(item, context_text, rag_history=""):
-    """執行單項 AI 檢核"""
-    prompt = f"""
-    你是一位醫療 AI 合規性審查專家。請針對以下原則分析文件內容。
-    
-    【檢核原則】
-    原則：{item['title']}
-    定義：{item['desc']}
-    
-    【歷史修正參考 (RAG)】
-    以下是過去人工審查對「{item['title']}」類似內容的修正建議，請將這些經驗納入本次判斷考量：
-    {rag_history if rag_history else "尚無歷史參考資料。"}
-    
-    【文件內容】
-    {context_text[:12000]}
-    
-    請根據上述資訊，以 JSON 格式回覆：
-    {{
-      "status": "存在" 或 "不存在",
-      "summary": "具體做法摘要",
-      "suggestion": "缺失建議"
-    }}
-    """
+    prompt = f"""你是一位醫療 AI 合規審查專家。原則：{item['title']}，定義：{item['desc']}。
+    歷史參考：{rag_history}。內容：{context_text[:12000]}。
+    以 JSON 回覆: {{"status": "存在/不存在", "summary": "摘要", "suggestion": "建議"}}"""
     try:
         response = model.generate_content(prompt)
         clean_text = re.sub(r"```json\n?|\n?```", "", response.text).strip()
         return json.loads(clean_text)
-    except Exception as e:
-        return {"status": "檢核錯誤", "summary": f"API 錯誤: {str(e)}", "suggestion": ""}
-
-
-
-import numpy as np
+    except:
+        return {"status": "檢核錯誤", "summary": "API 錯誤", "suggestion": ""}
 
 def get_embedding(text):
-    """將文字轉換為向量 - 修正模型路徑"""
     try:
-        # 嘗試使用最通用的 embedding 模型名稱
-        result = genai.embed_content(
-            model="models/gemini-embedding-001", # 如果 004 不行，001 是穩定首選
-            content=text,
-            task_type="retrieval_query"
-        )
+        result = genai.embed_content(model="models/embedding-001", content=text, task_type="retrieval_query")
         return result['embedding']
-    except Exception as e:
-        # 如果還是失敗，拋出錯誤以便調試
-        st.error(f"Embedding 錯誤: {e}")
-        return [0] * 768  # 回傳零向量避免後續計算崩潰
-        
-        
+    except: return [0] * 768
 
 def cosine_similarity(v1, v2):
-    """計算餘弦相似度"""
     return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
-    
-    
-def run_full_analysis(full_text):
-    """執行二階段 RAG 分析"""
-    # 1. 取得歷史 RAG 資料
-    rag_df = get_rag_df_from_github()
+
+def run_full_analysis(full_text, rag_df):
+    """執行單份文件的完整分析"""
     all_items = TRANSPARENCY_9 + GOVERNANCE_2
-    
-    results_t = []
-    results_g = []
-    
-    # 預先對 PDF 內容做 Embedding（取前 2000 字作為上下文代表，或切片處理）
-    # 這裡建議取計畫書開頭，通常包含研究目標與方法
-    pdf_context = full_text[:2000]
-    try:
-        pdf_vec = get_embedding(pdf_context)
-    except:
-        pdf_vec = None
+    results_t, results_g = [], []
+    pdf_vec = get_embedding(full_text[:2000])
 
     for i, item in enumerate(all_items):
         history = ""
-        
-        # --- 方案 B：二階段檢索開始 ---
-        if not rag_df.empty and "UserFeedback" in rag_df.columns:
-            # 第一階段：硬性篩選（只找標題完全相符的經驗）
+        if not rag_df.empty:
             rel_rows = rag_df[rag_df["Principle"] == item["title"]].copy()
-            
-            if not rel_rows.empty and pdf_vec is not None:
-                similarities = []
-                # 第二階段：語義篩選（計算歷史建議與「當前 PDF 內容」的相似度）
-                for fb in rel_rows["UserFeedback"].tolist():
-                    try:
-                        fb_vec = get_embedding(fb)
-                        # 計算 PDF 內容與歷史回饋的相關性
-                        sim = cosine_similarity(pdf_vec, fb_vec)
-                        similarities.append(sim)
-                    except:
-                        similarities.append(0)
-                
-                rel_rows["sim"] = similarities
-                # 取得最符合當前 PDF 情境的前 3 筆經驗
-                top_3 = rel_rows.sort_values(by="sim", ascending=False).head(3)
-                history = "\n".join([f"- {row['UserFeedback']}" for _, row in top_3.iterrows()])
-        # --- 方案 B：二階段檢索結束 ---
-
-        # 執行 AI 分析
-        res = analyze_item(item, full_text, rag_history=history)
+            if not rel_rows.empty:
+                # 簡單取最後三筆作為歷史參考（或依相似度）
+                history = "\n".join([f"- {fb}" for fb in rel_rows["UserFeedback"].tail(3).tolist()])
         
-        if i < 9:
-            results_t.append(res)
-        else:
-            results_g.append(res)
-            
+        res = analyze_item(item, full_text, rag_history=history)
+        if i < 9: results_t.append(res)
+        else: results_g.append(res)
     return {"t": results_t, "g": results_g}
 
-
-import io
-
-def convert_batch_to_xlsx(batch_results):
-    """將批次結果轉為多分頁 XLSX"""
-    output = io.BytesIO()
-    
-    # 使用 ExcelWriter 並指定引擎
+def convert_all_to_xlsx(batch_results):
+    """將所有檔案結果轉為多分頁 XLSX"""
+    output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        for filename, results in batch_results.items():
+        for filename, res in batch_results.items():
             data = []
-            # 處理 9 大原則
-            for i, item in enumerate(results['t']):
-                data.append({
-                    "分類": "九大透明性原則",
-                    "項目": TRANSPARENCY_9[i]['title'],
-                    "狀態": item['status'],
-                    "摘要": item['summary'],
-                    "建議": item['suggestion']
-                })
-            # 處理 2 大指標
-            for i, item in enumerate(results['g']):
-                data.append({
-                    "分類": "核心治理指標",
-                    "項目": GOVERNANCE_2[i]['title'],
-                    "狀態": item['status'],
-                    "摘要": item['summary'],
-                    "建議": item['suggestion']
-                })
+            for i, item in enumerate(res['t']):
+                data.append({"分類": "九大透明性", "項目": TRANSPARENCY_9[i]['title'], "狀態": item['status'], "摘要": item['summary'], "建議": item['suggestion']})
+            for i, item in enumerate(res['g']):
+                data.append({"分類": "核心治理", "項目": GOVERNANCE_2[i]['title'], "狀態": item['status'], "摘要": item['summary'], "建議": item['suggestion']})
             
-            # 檔案名稱過長或有特殊字元會導致分頁錯誤，需處理
-            sheet_name = re.sub(r'[\\/*?:\[\]]', '', filename)[:31]
             df = pd.DataFrame(data)
+            # Sheet 名稱不能超過 31 字元，且不能有特殊字元
+            sheet_name = re.sub(r'[\\/*?:\[\]]', '', filename)[:30]
             df.to_excel(writer, sheet_name=sheet_name, index=False)
-            
-            # 自動調整欄寬 (選配)
-            worksheet = writer.sheets[sheet_name]
-            for idx, col in enumerate(df.columns):
-                max_len = max(df[col].astype(str).map(len).max(), len(col)) + 2
-                worksheet.set_column(idx, idx, min(max_len, 50)) # 上限 50 字寬
-
     return output.getvalue()
-
 
 # ---------- 4. UI 介面 ----------
 
 def main():
-    st.set_page_config(page_title="醫療 AI 治理檢核", layout="wide")
-    st.title("🛡️ 負責任 AI 自動檢核系統 (RAG 強化版)")
+    st.set_page_config(page_title="醫療 AI 批次檢核", layout="wide")
+    st.title("🛡️ 負責任 AI 批次檢核系統")
 
-    if 'res_t' not in st.session_state:
-        st.session_state['res_t'] = None
+    if 'batch_results' not in st.session_state:
+        st.session_state['batch_results'] = {}
 
     with st.sidebar:
-        st.header("1. 檔案讀取")
-        pdf_files = st.file_uploader("上傳計畫書 PDF (可多選)", type="pdf", accept_multiple_files=True)
-        btn = st.button("🚀 開始分析", use_container_width=True)
-        st.divider()
-        st.info("您的回饋建議將存入 AI 知識庫，用於強化未來分析結果。")
+        st.header("1. 檔案上傳")
+        pdf_files = st.file_uploader("上傳多份計畫書 PDF", type="pdf", accept_multiple_files=True)
+        btn = st.button("🚀 開始批次分析", use_container_width=True)
 
     if pdf_files and btn:
-        all_pdf_results = {} # 用於儲存所有檔案的結果
-    
-        # 建立進度條
-        progress_bar = st.progress(0)
-    
-        for i, pdf_file in enumerate(pdf_files):
-            with st.spinner(f"正在分析 ({i+1}/{len(pdf_files)}): {pdf_file.name}"):
-                # 讀取 PDF
-                doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
-                full_text = "\n".join([page.get_text() for page in doc])
-            
-                # 執行原本的分析函式
-                results = run_full_analysis(full_text)
-                all_pdf_results[pdf_file.name] = results
-            
-            progress_bar.progress((i + 1) / len(pdf_files))
-    
-        st.session_state['batch_results'] = all_pdf_results
-        st.success("所有檔案分析完成！")
-
-    # 顯示結果
-    if st.session_state['res_t']:
-        st.subheader("📊 九大透明性原則")
-        t_data = st.session_state['res_t']
-        for r in range(3):
-            cols = st.columns(3)
-            for c in range(3):
-                idx = r * 3 + c
-                if idx < len(t_data):
-                    item = t_data[idx]
-                    with cols[c]:
-                        color = "green" if item['status'] == "存在" else "red"
-                        st.markdown(f"### {idx+1}. {TRANSPARENCY_9[idx]['title']}")
-                        st.markdown(f"**狀態：** :{color}[{item['status']}]")
-                        st.info(item['summary'])
-                        if item['suggestion']:
-                            st.warning(f"💡 建議：{item['suggestion']}")
-
-        st.divider()
-        st.subheader("📋 核心治理指標")
-        g_data = st.session_state['res_g']
-        df_g = pd.DataFrame([{
-            "評估項目": GOVERNANCE_2[i]['title'],
-            "狀態": d['status'],
-            "摘要": d['summary'],
-            "建議": d['suggestion']
-        } for i, d in enumerate(g_data)])
-        st.table(df_g)
-        # ---------- 新增：下載報告區塊 ----------
-        st.divider()
-        st.subheader("📥 匯出檢核報告")
+        rag_df = get_rag_df_from_github()
+        new_results = {}
         
-        csv_data = convert_results_to_csv()
-        if 'batch_results' in st.session_state and st.session_state['batch_results']:
-            st.divider()
-            st.subheader("📥 匯出批次報告")
-    
-            xlsx_data = convert_batch_to_xlsx(st.session_state['batch_results'])
-    
+        progress_bar = st.progress(0)
+        for idx, file in enumerate(pdf_files):
+            with st.status(f"正在分析 ({idx+1}/{len(pdf_files)}): {file.name}"):
+                doc = fitz.open(stream=file.read(), filetype="pdf")
+                text = "\n".join([page.get_text() for page in doc])
+                new_results[file.name] = run_full_analysis(text, rag_df)
+            progress_bar.progress((idx + 1) / len(pdf_files))
+        
+        st.session_state['batch_results'] = new_results
+        st.success("全部分析完成！")
+
+    # 顯示結果與下載
+    if st.session_state['batch_results']:
+        results = st.session_state['batch_results']
+        
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            xlsx_data = convert_all_to_xlsx(results)
             st.download_button(
-                label="💾 下載多頁 Excel 報告 (.xlsx)",
+                label="📥 下載多分頁 Excel 報告",
                 data=xlsx_data,
-                file_name=f"醫療AI批次檢核報告_{datetime.datetime.now().strftime('%Y%m%d')}.xlsx",
+                file_name=f"批次檢核報告_{datetime.datetime.now().strftime('%m%d_%H%M')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
-            # 讓使用者可以選擇查看特定檔案的結果
-            st.divider()
-            view_file = st.selectbox("查看詳細分析結果：", list(st.session_state['batch_results'].keys()))
-    
-            if view_file:
-                file_res = st.session_state['batch_results'][view_file]
-                
-        # 回饋收集
-        st.divider()
-        st.subheader("📝 訓練 AI 的判斷經驗 (RAG)")
-        with st.form("rag_feedback_form"):
-            all_titles = [i['title'] for i in (TRANSPARENCY_9 + GOVERNANCE_2)]
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                selected_title = st.selectbox("選擇要修正的項目", all_titles)
-            with col2:
-                user_comment = st.text_area("修正建議 (AI 哪裡看錯了？)", placeholder="例如：『應加強對表格內數據的識別』或『此類資訊通常出現在附件的技術規格中』")
-            submit_rag = st.form_submit_button("✅ 送出經驗並優化未來分析")
-            generalized_comment = generalize_feedback(user_comment)
-
-            if submit_rag:
-                if not GITHUB_TOKEN:
-                    st.error("請檢查 GITHUB_TOKEN 設定。")
-                elif not user_comment:
-                    st.warning("請填寫建議。")
-                else:
-                    all_results = st.session_state['res_t'] + st.session_state['res_g']
-                    idx = all_titles.index(selected_title)
-                    orig_sum = all_results[idx]['summary']
-                    
-                    with st.spinner("同步至 GitHub 中..."):
-                        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        if update_rag_to_github(selected_title, generalized_comment):
-                            st.success("回饋成功！下次分析將參考此經驗。")
-                        else:
-                            st.error("寫入失敗，請確認 Token 權限。")
+        # 預覽部分內容
+        selected_file = st.selectbox("查看預覽結果：", list(results.keys()))
+        if selected_file:
+            res = results[selected_file]
+            tab1, tab2 = st.tabs(["透明性原則", "治理指標"])
+            with tab1:
+                for i, r in enumerate(res['t']):
+                    with st.expander(f"{i+1}. {TRANSPARENCY_9[i]['title']} - {r['status']}"):
+                        st.write(f"**摘要:** {r['summary']}")
+                        st.write(f"**建議:** {r['suggestion']}")
+            with tab2:
+                st.table(pd.DataFrame(res['g']))
 
 if __name__ == "__main__":
     main()
