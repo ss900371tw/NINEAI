@@ -231,10 +231,10 @@ def main():
 
     with st.sidebar:
         st.header("1. 檔案讀取")
-        # 修改：允許上傳多個檔案
         pdf_files = st.file_uploader("上傳多份計畫書 PDF", type="pdf", accept_multiple_files=True)
         btn = st.button("🚀 開始批次分析", use_container_width=True)
         st.divider()
+        # 側邊欄保留下載按鈕作為快速入口
         if st.session_state['batch_results']:
             xlsx_data = convert_all_results_to_xlsx()
             st.download_button(
@@ -242,7 +242,8 @@ def main():
                 data=xlsx_data,
                 file_name=f"醫療AI批次檢核報告_{datetime.datetime.now().strftime('%Y%m%d')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
+                use_container_width=True,
+                key="sidebar_download"
             )
 
     if pdf_files and btn:
@@ -271,6 +272,21 @@ def main():
     # 顯示結果 (使用 Tabs 區分不同檔案)
     if st.session_state['batch_results']:
         file_names = list(st.session_state['batch_results'].keys())
+        
+        # 新增：在報表上方也提供一個明顯的下載按鈕
+        st.write("---")
+        c1, c2 = st.columns([8, 2])
+        with c2:
+            xlsx_data_main = convert_all_results_to_xlsx()
+            st.download_button(
+                label="📥 下載所有分析報表",
+                data=xlsx_data_main,
+                file_name=f"Medical_AI_Audit_{datetime.datetime.now().strftime('%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                key="main_download"
+            )
+
         tabs = st.tabs(file_names)
         
         for i, name in enumerate(file_names):
