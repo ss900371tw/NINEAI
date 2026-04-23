@@ -251,15 +251,25 @@ def main():
         
         for idx, pdf_file in enumerate(pdf_files):
             with st.status(f"正在分析 ({idx+1}/{len(pdf_files)}): {pdf_file.name}...") as status:
+                # 建立一個空容器，用來動態更新文字
+                log_placeholder = st.empty()
+        
+                # 步驟 1
+                log_placeholder.markdown("🔍 正在從 PDF 提取文字...")
                 doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
-                st.write("🔍 正在從 PDF 提取文字...")
                 full_text = "\n".join([page.get_text() for page in doc])
-                st.write("🧠 正在呼叫 Gemini Pro 進行合規性審查...")
+        
+                # 步驟 2 (內容會直接覆蓋掉上面的文字)
+                log_placeholder.markdown("🧠 正在呼叫 Gemini Pro 進行合規性審查...")
                 results = run_full_analysis(full_text)
-                st.write("📊 正在彙整分析結果...")
+        
+                # 步驟 3
+                log_placeholder.markdown("📊 正在彙整分析結果...")
                 st.session_state['batch_results'][pdf_file.name] = results
+        
+                # 完成後，如果不想要裡面留著最後一行字，甚至可以呼叫 log_placeholder.empty() 清空
                 status.update(label=f"✅ {pdf_file.name} 分析完成", state="complete")
-            progress_bar.progress((idx + 1) / len(pdf_files))
+                progress_bar.progress((idx + 1) / len(pdf_files))
 
     # 顯示結果 (使用 Tabs 區分不同檔案)
     if st.session_state['batch_results']:
