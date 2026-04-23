@@ -68,8 +68,42 @@ GOVERNANCE_2 = [
 
 import csv
 
-import csv
-import io
+from google.cloud import vision
+
+def perform_google_ocr(pdf_file_bytes):
+    """使用 Google Cloud Vision API 進行掃描檔辨識"""
+    client = vision.ImageAnnotatorClient()
+    
+    # 將 PDF 位元組轉換為 Vision API 格式
+    # 這裡建議將 PDF 轉為圖片處理，或使用 Vision API 的 async_batch_annotate_files (針對 PDF)
+    # 為了流程簡單且快速，我們維持單頁處理或轉圖片辨識
+    
+    doc = fitz.open(stream=pdf_file_bytes, filetype="pdf")
+    full_text = ""
+    
+    for page in doc:
+        # 將頁面渲染為圖片 (300 DPI)
+        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+        img_bytes = pix.tobytes("png")
+        
+        image = vision.Image(content=img_bytes)
+        response = client.text_detection(image=image)
+        
+        if response.text_annotations:
+            full_text += response.text_annotations[0].description + "\n"
+            
+    return full_text
+
+def get_smart_text(pdf_file_bytes):
+    """智慧判斷：若原生文字太少則啟動 OCR"""
+    doc = fitz.open(stream=pdf_file_bytes, filetype="pdf")
+    native_text = "\n".join([page.get_text() for page in doc])
+    
+    # 如果原生文字長度過短 (例如 < 100字)，判定為掃描檔
+    if len(native_text.strip()) < 100:
+        return perform_google_ocr(pdf_file_bytes)
+    return native_text
+
 
 def get_rag_df_from_github():
     """從 GitHub 讀取目前的 RAG 庫，增加強健性處理"""
@@ -311,15 +345,17 @@ def main():
         progress_bar = st.progress(0)
         
         for idx, pdf_file in enumerate(pdf_files):
-            # 使用 status 顯示當前進度，完成後它會停留在頁面直到下一次互動
             with st.status(f"正在分析 ({idx+1}/{len(pdf_files)}): {pdf_file.name}...") as status:
                 log_placeholder = st.empty()
-                
-                # 讀取 PDF
-                doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
-                full_text = "\n".join([page.get_text() for page in doc])
-                
-                log_placeholder.markdown("🧠 正在呼叫 Gemini Pro 進行合規性審查...")
+        
+                # 讀取檔案內容
+                pdf_bytes = pdf_file.read()
+        
+                # 使用智慧文字提取 (包含 OCR)
+                log_placeholder.markdown("🔍 正在辨識文字 (含掃描檔 OCR)...")
+                full_text = get_smart_text(pdf_bytes)
+        
+                log_placeholder.markdown("🧠 正在呼叫 Gemini 2.5 Pro 進行合規性審查...")
                 results = run_full_analysis(full_text)
                 
                 log_placeholder.markdown("📊 已彙整分析結果...")
