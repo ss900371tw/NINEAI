@@ -107,25 +107,23 @@ def perform_google_ocr(pdf_file_bytes):
         return ""
 
 def get_smart_text(pdf_file_bytes):
-    doc = fitz.open(stream=pdf_file_bytes, filetype="pdf")
-    native_text = "\n".join([page.get_text() for page in doc])
+    doc = fitz.open(stream=pdf_file_bytes, filetype="pdf")
+    native_text = "\n".join([page.get_text() for page in doc])
     
-    # 如果原生文字長度過短 (例如 < 100字)，判定為掃描檔
-    if len(native_text.strip()) < 100:
-        return perform_google_ocr(pdf_file_bytes)
-    return native_text
+    # 如果原生文字長度過短 (例如 < 100字)，判定為掃描檔
+    if len(native_text.strip()) < 100:
+        return perform_google_ocr(pdf_file_bytes)
+    return native_text
 
 
 def get_rag_df_from_github():
-    """從 GitHub 讀取目前的 RAG 庫，增加強健性處理"""
-    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}", 
-        "Accept": "application/vnd.github.v3+json",
-        "Cache-Control": "no-cache"
-    }
-    
-    try:
+    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}", 
+        "Accept": "application/vnd.github.v3+json",
+        "Cache-Control": "no-cache"
+    }
+    try:
         if res.status_code == 200:
             file_json = res.json()
             content = base64.b64decode(file_json['content']).decode('utf-8').replace('\x00', '')
