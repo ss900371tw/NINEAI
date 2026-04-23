@@ -235,16 +235,7 @@ def main():
         btn = st.button("🚀 開始批次分析", use_container_width=True)
         st.divider()
         # 側邊欄保留下載按鈕作為快速入口
-        if st.session_state['batch_results']:
-            xlsx_data = convert_all_results_to_xlsx()
-            st.download_button(
-                label="📥 下載完整 Excel 報告",
-                data=xlsx_data,
-                file_name=f"醫療AI批次檢核報告_{datetime.datetime.now().strftime('%Y%m%d')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-                key="sidebar_download"
-            )
+
 
     if pdf_files and btn:
         st.session_state['batch_results'] = {} # 清空舊結果
@@ -286,6 +277,7 @@ def main():
                 use_container_width=True,
                 key="main_download"
             )
+            st.write("---")
 
         tabs = st.tabs(file_names)
         
