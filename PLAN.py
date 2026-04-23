@@ -109,8 +109,6 @@ def perform_google_ocr(pdf_file_bytes):
 def get_smart_text(pdf_file_bytes):
     doc = fitz.open(stream=pdf_file_bytes, filetype="pdf")
     native_text = "\n".join([page.get_text() for page in doc])
-    
-    # 如果原生文字長度過短 (例如 < 100字)，判定為掃描檔
     if len(native_text.strip()) < 100:
         return perform_google_ocr(pdf_file_bytes)
     return native_text
