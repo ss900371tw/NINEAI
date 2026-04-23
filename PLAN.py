@@ -240,34 +240,49 @@ def run_full_analysis(full_text):
             
     return {"t": results_t, "g": results_g}
 
-def convert_results_to_csv():
-    """將目前的分析結果轉換為 CSV 格式供下載"""
-    if 'res_t' not in st.session_state or st.session_state['res_t'] is None:
-        return None
+
+import io
+
+def convert_batch_to_xlsx(batch_results):
+    """將批次結果轉為多分頁 XLSX"""
+    output = io.BytesIO()
     
-    data = []
-    # 處理 9 大原則
-    for i, item in enumerate(st.session_state['res_t']):
-        data.append({
-            "分類": "九大透明性原則",
-            "項目": TRANSPARENCY_9[i]['title'],
-            "狀態": item['status'],
-            "摘要": item['summary'],
-            "建議": item['suggestion']
-        })
-    # 處理 2 大指標
-    for i, item in enumerate(st.session_state['res_g']):
-        data.append({
-            "分類": "核心治理指標",
-            "項目": GOVERNANCE_2[i]['title'],
-            "狀態": item['status'],
-            "摘要": item['summary'],
-            "建議": item['suggestion']
-        })
-    
-    df = pd.DataFrame(data)
-    # 使用 StringIO 轉為 CSV 字串
-    return df.to_csv(index=False).encode('utf-8-sig')
+    # 使用 ExcelWriter 並指定引擎
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        for filename, results in batch_results.items():
+            data = []
+            # 處理 9 大原則
+            for i, item in enumerate(results['t']):
+                data.append({
+                    "分類": "九大透明性原則",
+                    "項目": TRANSPARENCY_9[i]['title'],
+                    "狀態": item['status'],
+                    "摘要": item['summary'],
+                    "建議": item['suggestion']
+                })
+            # 處理 2 大指標
+            for i, item in enumerate(results['g']):
+                data.append({
+                    "分類": "核心治理指標",
+                    "項目": GOVERNANCE_2[i]['title'],
+                    "狀態": item['status'],
+                    "摘要": item['summary'],
+                    "建議": item['suggestion']
+                })
+            
+            # 檔案名稱過長或有特殊字元會導致分頁錯誤，需處理
+            sheet_name = re.sub(r'[\\/*?:\[\]]', '', filename)[:31]
+            df = pd.DataFrame(data)
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+            
+            # 自動調整欄寬 (選配)
+            worksheet = writer.sheets[sheet_name]
+            for idx, col in enumerate(df.columns):
+                max_len = max(df[col].astype(str).map(len).max(), len(col)) + 2
+                worksheet.set_column(idx, idx, min(max_len, 50)) # 上限 50 字寬
+
+    return output.getvalue()
+
 
 # ---------- 4. UI 介面 ----------
 
@@ -280,18 +295,31 @@ def main():
 
     with st.sidebar:
         st.header("1. 檔案讀取")
-        pdf_file = st.file_uploader("上傳計畫書 PDF", type="pdf")
+        pdf_files = st.file_uploader("上傳計畫書 PDF (可多選)", type="pdf", accept_multiple_files=True)
         btn = st.button("🚀 開始分析", use_container_width=True)
         st.divider()
         st.info("您的回饋建議將存入 AI 知識庫，用於強化未來分析結果。")
 
-    if pdf_file and btn:
-        with st.spinner("正在讀取檔案並檢索歷史經驗..."):
+    if pdf_files and btn:
+    all_pdf_results = {} # 用於儲存所有檔案的結果
+    
+    # 建立進度條
+    progress_bar = st.progress(0)
+    
+    for i, pdf_file in enumerate(pdf_files):
+        with st.spinner(f"正在分析 ({i+1}/{len(pdf_files)}): {pdf_file.name}"):
+            # 讀取 PDF
             doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
             full_text = "\n".join([page.get_text() for page in doc])
+            
+            # 執行原本的分析函式
             results = run_full_analysis(full_text)
-            st.session_state['res_t'] = results['t']
-            st.session_state['res_g'] = results['g']
+            all_pdf_results[pdf_file.name] = results
+            
+        progress_bar.progress((i + 1) / len(pdf_files))
+    
+    st.session_state['batch_results'] = all_pdf_results
+    st.success("所有檔案分析完成！")
 
     # 顯示結果
     if st.session_state['res_t']:
@@ -326,18 +354,25 @@ def main():
         st.subheader("📥 匯出檢核報告")
         
         csv_data = convert_results_to_csv()
-        if csv_data:
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                st.download_button(
-                    label="💾 下載 CSV 報告",
-                    data=csv_data,
-                    file_name=f"醫療AI檢核報告_{datetime.datetime.now().strftime('%Y%m%d')}.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
-            with col2:
-                st.caption("按鈕將下載包含透明性原則與治理指標的完整彙總表格。")
+        if 'batch_results' in st.session_state and st.session_state['batch_results']:
+            st.divider()
+            st.subheader("📥 匯出批次報告")
+    
+            xlsx_data = convert_batch_to_xlsx(st.session_state['batch_results'])
+    
+            st.download_button(
+                label="💾 下載多頁 Excel 報告 (.xlsx)",
+                data=xlsx_data,
+                file_name=f"醫療AI批次檢核報告_{datetime.datetime.now().strftime('%Y%m%d')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+            # 讓使用者可以選擇查看特定檔案的結果
+            st.divider()
+            view_file = st.selectbox("查看詳細分析結果：", list(st.session_state['batch_results'].keys()))
+    
+            if view_file:
+                file_res = st.session_state['batch_results'][view_file]
                 
         # 回饋收集
         st.divider()
