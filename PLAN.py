@@ -124,25 +124,23 @@ def get_rag_df_from_github():
         "Accept": "application/vnd.github.v3+json",
         "Cache-Control": "no-cache"
     }
-
     try:
-        res = requests.get(url, headers=headers)
         if res.status_code == 200:
             file_json = res.json()
-            # 使用 utf-8 讀取並過濾掉可能導致問題的 null bytes
             content = base64.b64decode(file_json['content']).decode('utf-8').replace('\x00', '')
+            
             if not content.strip(): 
                 return pd.DataFrame(columns=["Principle", "UserFeedback"])
             
-            # 核心修正：使用更嚴格的解析參數
+            # 修正處：將 io.StringIO 改為 StringIO
             return pd.read_csv(
-                io.StringIO(content), 
+                StringIO(content),  # 這裡直接用已導入的物件
                 sep=',',
-                quotechar='"',          # 指定引號字元
-                doublequote=True,       # 允許雙引號轉義
-                escapechar='\\',        # 增加逃逸字元處理
-                on_bad_lines='skip',    # 遇到毀損行直接跳過，確保程式不崩潰
-                engine='python'         # Python 引擎對損壞檔案的容忍度較高
+                quotechar='"',
+                doublequote=True,
+                escapechar='\\',
+                on_bad_lines='skip',
+                engine='python'
             )
         else:
             return pd.DataFrame(columns=["Principle", "UserFeedback"])
