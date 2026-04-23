@@ -337,10 +337,9 @@ def main():
         st.header("1. 檔案讀取")
         # 加上 key="medical_pdf_uploader" 解決 DuplicateElementId 問題
         pdf_files = st.file_uploader(
-            "上傳多份計畫書 PDF", 
             type="pdf", 
             accept_multiple_files=True, 
-            key="medical_pdf_uploader"
+            key="audit_pdf_uploader"  # 確保這個 ID 在整個 App 中是唯一的
         )
         
         btn = st.button("🚀 開始批次分析", use_container_width=True)
