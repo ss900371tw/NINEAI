@@ -328,47 +328,51 @@ def convert_all_results_to_xlsx():
 def main():
     st.set_page_config(page_title="醫療 AI 治理檢核", layout="wide")
     st.title("🛡️ 負責任 AI 自動檢核系統")
+
     # 1. 初始化 session_state
     if 'batch_results' not in st.session_state:
         st.session_state['batch_results'] = {}
-    if 'analysis_done' not in st.session_state:
-        st.session_state['analysis_done'] = False
+    
     with st.sidebar:
         st.header("1. 檔案讀取")
-        pdf_files = st.file_uploader("上傳多份計畫書 PDF", type="pdf", accept_multiple_files=True)
+        # 加上 key="medical_pdf_uploader" 解決 DuplicateElementId 問題
+        pdf_files = st.file_uploader(
+            "上傳多份計畫書 PDF", 
+            type="pdf", 
+            accept_multiple_files=True, 
+            key="medical_pdf_uploader"
+        )
+        
         btn = st.button("🚀 開始批次分析", use_container_width=True)
         st.divider()
-    # 2. 執行分析邏輯 (僅在點擊按鈕時觸發)
+
+    # 2. 執行分析邏輯
     if pdf_files and btn:
-        st.session_state['batch_results'] = {} 
-        st.session_state['analysis_done'] = False
+        # 清除舊結果，準備新分析
+        st.session_state['batch_results'] = {}
         
         progress_bar = st.progress(0)
+        num_files = len(pdf_files)
         
         for idx, pdf_file in enumerate(pdf_files):
-            with st.status(f"正在分析 ({idx+1}/{len(pdf_files)}): {pdf_file.name}...") as status:
-                log_placeholder = st.empty()
-        
-                # 讀取檔案內容
-                pdf_bytes = pdf_file.read()
-        
-                # 使用智慧文字提取 (包含 OCR)
-                log_placeholder.markdown("🔍 正在辨識文字 (含掃描檔 OCR)...")
+            with st.status(f"正在分析 ({idx+1}/{num_files}): {pdf_file.name}...") as status:
+                # 這裡使用 .getvalue() 而不是 .read()，避免大型檔案指標偏移問題
+                pdf_bytes = pdf_file.getvalue() 
+                
+                st.write("🔍 正在辨識文字 (含掃描檔 OCR)...")
                 full_text = get_smart_text(pdf_bytes)
-        
-                log_placeholder.markdown("🧠 正在呼叫 Gemini 2.5 Pro 進行合規性審查...")
+                
+                st.write("🧠 正在呼叫 Gemini 2.5 Pro 進行審查...")
                 results = run_full_analysis(full_text)
                 
-                log_placeholder.markdown("📊 已彙整分析結果...")
                 st.session_state['batch_results'][pdf_file.name] = results
-                
                 status.update(label=f"✅ {pdf_file.name} 分析完成", state="complete")
-                progress_bar.progress((idx + 1) / len(pdf_files))
+                progress_bar.progress((idx + 1) / num_files)
         
-        st.session_state['analysis_done'] = True
-        st.rerun() # 強制重新整理一次，讓 status 消失，轉向顯示持久化的結果
+        st.success("所有檔案分析完畢！")
+        # 移除 st.rerun()，Streamlit 會自動處理剩餘的 UI 渲染
 
-    # 3. 顯示結果 (這部分獨立於 st.status，因此按下載不會消失)
+    # 3. 顯示結果 (邏輯保持不變，但確保有資料才顯示)
     if st.session_state['batch_results']:
         file_names = list(st.session_state['batch_results'].keys())
         
