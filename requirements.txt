@@ -2,6 +2,16 @@ streamlit>=1.34.0
 python-dotenv>=1.0.1
 pandas>=2.2.2
 google
+streamlit
+PyMuPDF
+google-cloud-vision
+google-auth
+pandas
+google-generativeai
+python-dotenv
+requests
+xlsxwriter
+numpy
 chromadb
 streamlit
 google-cloud-vision
