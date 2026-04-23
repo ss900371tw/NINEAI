@@ -352,22 +352,33 @@ def main():
         st.session_state['analysis_done'] = False
         progress_bar = st.progress(0)
         for idx, pdf_file in enumerate(pdf_files):
-            # 使用 status 顯示當前進度，完成後它會停留在頁面直到下一次互動
-            with st.status(f"正在分析 ({idx+1}/{len(pdf_files)}): {pdf_file.name}...", expanded=True) as status:
-                log_placeholder = st.empty() # 在 status 內部建立佔位空間
-    
-                log_placeholder.write("📂 正在讀取 PDF 內容...")
-                doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
-                full_text = "\n".join([page.get_text() for page in doc])
-    
-                log_placeholder.write("🧠 正在呼叫 Gemini Pro 進行合規性審查...")
+            with st.status(f"正在分析: {pdf_file.name}", expanded=True) as status:
+                info_text = st.empty() # 動態文字佔位
+                
+                # --- 步驟 1: 讀取與智慧文字擷取 ---
+                info_text.markdown("🔍 **步驟 1:** 正在偵測文件格式...")
+                pdf_bytes = pdf_file.read()
+                
+                # 這裡調用 get_smart_text，並根據內容長度給予 OCR 提示
+                doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+                native_text = "\n".join([page.get_text() for page in doc])
+                
+                if len(native_text.strip()) < 100:
+                    info_text.markdown("📷 **偵測為掃描檔，正在啟動 Google Cloud Vision OCR 辨識...** (這可能需要較長時間)")
+                    full_text = perform_google_ocr(pdf_bytes)
+                else:
+                    info_text.markdown("📄 **偵測為原生文字 PDF，直接擷取內容...**")
+                    full_text = native_text
+                
+                # --- 步驟 2: AI 分析 ---
+                info_text.markdown("🧠 **步驟 2:** 正在呼叫 Gemini 2.5 Pro 進行合規性審查...")
                 results = run_full_analysis(full_text)
-    
-                log_placeholder.write("📊 正在彙整分析結果...")
+                
+                # --- 步驟 3: 彙整 ---
+                info_text.markdown("📊 **步驟 3:** 正在彙整分析結果...")
                 st.session_state['batch_results'][pdf_file.name] = results
-    
-                # 這裡可以選擇清除 log 或保留
-                log_placeholder.empty() 
+                
+                # 完成更新
                 status.update(label=f"✅ {pdf_file.name} 分析完成", state="complete", expanded=False)
                 progress_bar.progress((idx + 1) / len(pdf_files))
         
