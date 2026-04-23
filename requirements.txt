@@ -4,7 +4,7 @@ pandas>=2.2.2
 google
 chromadb
 streamlit
-google-generativeai
+google-cloud-vision
 qdrant-client
 pymupdf
 pandas
