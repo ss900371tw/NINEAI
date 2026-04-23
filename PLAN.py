@@ -153,22 +153,30 @@ def get_rag_df_from_github():
 
 
 def update_rag_to_github(principle, feedback):
-    """將回饋存入 GitHub，強制執行格式標準化"""
+    """將回饋存入 GitHub，解決 res variable 未定義與格式問題"""
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}", 
+        "Accept": "application/vnd.github.v3+json",
+        "Cache-Control": "no-cache"
+    }
 
-    # 1. 取得現有資料 (已包含錯誤處理)
+    # 1. 先獲取目前的檔案資訊以取得 SHA (這是更新 GitHub 檔案必備的)
+    current_sha = None
+    res_get = requests.get(url, headers=headers) # 改名為 res_get 避免混淆
+    
+    if res_get.status_code == 200:
+        current_sha = res_get.json().get('sha')
+    elif res_get.status_code != 404:
+        # 如果不是「檔案不存在」的其他錯誤，就報錯
+        st.error(f"無法連線至 GitHub API: {res_get.status_code}")
+        return False
+
+    # 2. 取得現有資料 (DataFrame)
     df = get_rag_df_from_github()
     
-    # 再次確認 SHA
-    res = requests.get(url, headers=headers)
-    sha = res.json().get('sha') if res.status_code == 200 else None
-
-    # 2. 清理 Feedback 內容：移除所有可能干擾 CSV 的字元
-    # 移除雙引號避免嵌套錯誤，並統一換行符號
+    # 3. 清理與加入新資料
     clean_feedback = str(feedback).replace('"', "'").replace('\n', ' ').strip()
-
-    # 3. 加入新列
     new_data = pd.DataFrame([{
         "Principle": principle,
         "UserFeedback": clean_feedback,
@@ -176,7 +184,7 @@ def update_rag_to_github(principle, feedback):
     
     df = pd.concat([df, new_data], ignore_index=True)
 
-    # 4. 轉回 CSV：強制對所有欄位加引號，確保解析安全
+    # 4. 轉換為 CSV 內容
     csv_content = df.to_csv(
         index=False, 
         encoding='utf-8', 
@@ -186,15 +194,22 @@ def update_rag_to_github(principle, feedback):
     
     encoded_content = base64.b64encode(csv_content.encode('utf-8')).decode('utf-8')
     
+    # 5. 推送到 GitHub
     payload = {
-        "message": f"Fix & Update RAG feedback for {principle}",
-        "content": encoded_content,
-        "sha": sha
+        "message": f"Update RAG: {principle}",
+        "content": encoded_content
     }
-    
-    put_res = requests.put(url, headers=headers, json=payload)
-    return put_res.status_code in [200, 201]
+    if current_sha:
+        payload["sha"] = current_sha # 如果檔案已存在，必須提供 sha
 
+    # 這裡明確定義 res 變數
+    res_put = requests.put(url, headers=headers, json=payload)
+    
+    if res_put.status_code in [200, 201]:
+        return True
+    else:
+        st.error(f"GitHub 更新失敗: {res_put.text}")
+        return False
 
 
 def generalize_feedback(specific_feedback):
