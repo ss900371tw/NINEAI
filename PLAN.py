@@ -70,14 +70,26 @@ def get_rag_df_from_github():
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{FILE_PATH}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
     res = requests.get(url, headers=headers)
+    
     if res.status_code == 200:
         content = base64.b64decode(res.json()['content']).decode('utf-8')
+        
+        # 檢查是否為空的或只有換行
         if not content.strip():
             return pd.DataFrame(columns=["Principle", "UserFeedback"])
-        try:
-            return pd.read_csv(StringIO(content))
-        except pd.errors.EmptyDataError:
+        
+        # 檢查是否意外抓到 HTML (例如 404 頁面)
+        if content.strip().startswith("<!DOCTYPE"):
+            st.error("GitHub 回傳了 HTML 而非 CSV，請檢查 FILE_PATH 或權限。")
             return pd.DataFrame(columns=["Principle", "UserFeedback"])
+
+        try:
+            # 加入 on_bad_lines='skip' 避免單一損壞行導致整個 App 崩潰
+            return pd.read_csv(StringIO(content), on_bad_lines='skip')
+        except Exception as e:
+            st.warning(f"解析 CSV 失敗: {e}")
+            return pd.DataFrame(columns=["Principle", "UserFeedback"])
+            
     return pd.DataFrame(columns=["Principle", "UserFeedback"])
 
 def generalize_feedback(specific_feedback):
