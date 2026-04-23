@@ -270,7 +270,6 @@ def main():
         file_names = list(st.session_state['batch_results'].keys())
         
         # 新增：在報表上方也提供一個明顯的下載按鈕
-        st.write("---")
         c1, c2 = st.columns([8, 2])
         with c2:
             xlsx_data_main = convert_all_results_to_xlsx()
