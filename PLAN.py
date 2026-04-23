@@ -353,17 +353,22 @@ def main():
         progress_bar = st.progress(0)
         for idx, pdf_file in enumerate(pdf_files):
             # 使用 status 顯示當前進度，完成後它會停留在頁面直到下一次互動
-            with st.status(f"正在分析 ({idx+1}/{len(pdf_files)}): {pdf_file.name}...") as status:
-                log_placeholder = st.empty()
-                
-                # 讀取 PDF
+            with st.status(f"正在分析 ({idx+1}/{len(pdf_files)}): {pdf_file.name}...", expanded=True) as status:
+                log_placeholder = st.empty() # 在 status 內部建立佔位空間
+    
+                log_placeholder.write("📂 正在讀取 PDF 內容...")
                 doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
                 full_text = "\n".join([page.get_text() for page in doc])
-                log_placeholder.markdown("🧠 正在呼叫 Gemini Pro 進行合規性審查...")
+    
+                log_placeholder.write("🧠 正在呼叫 Gemini Pro 進行合規性審查...")
                 results = run_full_analysis(full_text)
-                log_placeholder.markdown("📊 已彙整分析結果...")
+    
+                log_placeholder.write("📊 正在彙整分析結果...")
                 st.session_state['batch_results'][pdf_file.name] = results
-                status.update(label=f"✅ {pdf_file.name} 分析完成", state="complete")
+    
+                # 這裡可以選擇清除 log 或保留
+                log_placeholder.empty() 
+                status.update(label=f"✅ {pdf_file.name} 分析完成", state="complete", expanded=False)
                 progress_bar.progress((idx + 1) / len(pdf_files))
         
         st.session_state['analysis_done'] = True
