@@ -256,7 +256,7 @@ def main():
                 log_placeholder.markdown("🧠 正在呼叫 Gemini Pro 進行合規性審查...")
                 results = run_full_analysis(full_text)
                 
-                log_placeholder.markdown("📊 正在彙整分析結果...")
+                log_placeholder.markdown("📊 已彙整分析結果...")
                 st.session_state['batch_results'][pdf_file.name] = results
                 
                 status.update(label=f"✅ {pdf_file.name} 分析完成", state="complete")
