@@ -352,13 +352,16 @@ def main():
         st.session_state['batch_results'] = {} 
         st.session_state['analysis_done'] = False
         with status_container.container():
+            total_files = len(pdf_files)
             progress_bar = st.progress(0)
             for idx, pdf_file in enumerate(pdf_files):
-                with st.status(f"正在分析: {pdf_file.name}", expanded=True) as status:
+                current_count = idx + 1
+                status_label = f"({current_count}/{total_files}) 正在分析: {pdf_file.name}"
+                with st.status(status_label, expanded=True) as status:
                     info_text = st.empty() # 動態文字佔位
                 
                     # --- 步驟 1: 讀取與智慧文字擷取 ---
-                    info_text.markdown("🔍 **步驟 1:** 正在偵測文件格式...")
+                    info_text.markdown("🔍 ** 正在偵測文件格式...**")
                     pdf_bytes = pdf_file.read()
                 
                     # 這裡調用 get_smart_text，並根據內容長度給予 OCR 提示
