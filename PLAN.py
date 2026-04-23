@@ -39,7 +39,7 @@ SAFETY_SETTINGS = [
 
 # 初始化模型
 model = genai.GenerativeModel(
-    model_name="gemini-2.5-pro", 
+    model_name="gemini-2.5-pro",
     generation_config={
         "response_mime_type": "application/json",
         "temperature": 0.1,
