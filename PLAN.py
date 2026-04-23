@@ -253,9 +253,6 @@ def main():
             with st.status(f"正在分析 ({idx+1}/{len(pdf_files)}): {pdf_file.name}...") as status:
                 # 建立一個空容器，用來動態更新文字
                 log_placeholder = st.empty()
-        
-                # 步驟 1
-                log_placeholder.markdown("🔍 正在從 PDF 提取文字...")
                 doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
                 full_text = "\n".join([page.get_text() for page in doc])
         
