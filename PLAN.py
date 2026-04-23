@@ -341,9 +341,7 @@ def main():
         pdf_files = st.file_uploader(
             "上傳多份計畫書 PDF", 
             type="pdf", 
-            accept_multiple_files=True, 
-            key="medical_audit_uploader"
-        )
+            accept_multiple_files=True)
         # 為按鈕也加上 key 確保唯一性
         btn = st.button("🚀 開始批次分析", use_container_width=True, key="start_analysis_btn")
         st.divider()
