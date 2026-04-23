@@ -356,7 +356,7 @@ def main():
             progress_bar = st.progress(0)
             for idx, pdf_file in enumerate(pdf_files):
                 current_count = idx + 1
-                status_label = f"({current_count}/{total_files}) 正在分析: {pdf_file.name}"
+                status_label = f"【{current_count}/{total_files}】 正在分析: {pdf_file.name}"
                 with st.status(status_label, expanded=True) as status:
                     info_text = st.empty() # 動態文字佔位
                 
