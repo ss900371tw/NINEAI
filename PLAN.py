@@ -350,14 +350,18 @@ def main():
     if pdf_files and btn:
         st.session_state['batch_results'] = {} 
         st.session_state['analysis_done'] = False
-        
         progress_bar = st.progress(0)
-        
         for idx, pdf_file in enumerate(pdf_files):
+            # 使用 status 顯示當前進度，完成後它會停留在頁面直到下一次互動
             with st.status(f"正在分析 ({idx+1}/{len(pdf_files)}): {pdf_file.name}...") as status:
-                pdf_bytes = pdf_file.getvalue() # 使用 getvalue() 更穩健
-                full_text = get_smart_text(pdf_bytes)
+                log_placeholder = st.empty()
+                
+                # 讀取 PDF
+                doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+                full_text = "\n".join([page.get_text() for page in doc])
+                log_placeholder.markdown("🧠 正在呼叫 Gemini Pro 進行合規性審查...")
                 results = run_full_analysis(full_text)
+                log_placeholder.markdown("📊 已彙整分析結果...")
                 st.session_state['batch_results'][pdf_file.name] = results
                 status.update(label=f"✅ {pdf_file.name} 分析完成", state="complete")
                 progress_bar.progress((idx + 1) / len(pdf_files))
