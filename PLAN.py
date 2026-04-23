@@ -240,7 +240,34 @@ def run_full_analysis(full_text):
             
     return {"t": results_t, "g": results_g}
 
-
+def convert_results_to_csv():
+    """將目前的分析結果轉換為 CSV 格式供下載"""
+    if 'res_t' not in st.session_state or st.session_state['res_t'] is None:
+        return None
+    
+    data = []
+    # 處理 9 大原則
+    for i, item in enumerate(st.session_state['res_t']):
+        data.append({
+            "分類": "九大透明性原則",
+            "項目": TRANSPARENCY_9[i]['title'],
+            "狀態": item['status'],
+            "摘要": item['summary'],
+            "建議": item['suggestion']
+        })
+    # 處理 2 大指標
+    for i, item in enumerate(st.session_state['res_g']):
+        data.append({
+            "分類": "核心治理指標",
+            "項目": GOVERNANCE_2[i]['title'],
+            "狀態": item['status'],
+            "摘要": item['summary'],
+            "建議": item['suggestion']
+        })
+    
+    df = pd.DataFrame(data)
+    # 使用 StringIO 轉為 CSV 字串
+    return df.to_csv(index=False).encode('utf-8-sig')
 
 # ---------- 4. UI 介面 ----------
 
@@ -294,7 +321,24 @@ def main():
             "建議": d['suggestion']
         } for i, d in enumerate(g_data)])
         st.table(df_g)
-
+        # ---------- 新增：下載報告區塊 ----------
+        st.divider()
+        st.subheader("📥 匯出檢核報告")
+        
+        csv_data = convert_results_to_csv()
+        if csv_data:
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                st.download_button(
+                    label="💾 下載 CSV 報告",
+                    data=csv_data,
+                    file_name=f"醫療AI檢核報告_{datetime.datetime.now().strftime('%Y%m%d')}.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+            with col2:
+                st.caption("按鈕將下載包含透明性原則與治理指標的完整彙總表格。")
+                
         # 回饋收集
         st.divider()
         st.subheader("📝 訓練 AI 的判斷經驗 (RAG)")
