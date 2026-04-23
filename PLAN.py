@@ -31,38 +31,38 @@ genai.configure(api_key=GOOGLE_API_KEY)
 
 # 安全性設定
 SAFETY_SETTINGS = [
-    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
 ]
 
 # 初始化模型
 model = genai.GenerativeModel(
-    model_name="gemini-2.5-pro", 
-    generation_config={
-        "response_mime_type": "application/json",
-        "temperature": 0.1,
-    },
-    safety_settings=SAFETY_SETTINGS
+    model_name="gemini-2.5-pro", 
+    generation_config={
+        "response_mime_type": "application/json",
+        "temperature": 0.1,
+        },
+    safety_settings=SAFETY_SETTINGS
 )
 
 # ---------- 2. 原則定義 (保持不變) ----------
 TRANSPARENCY_9 = [
-    {"title": "介入詳情及輸出", "desc": "需清楚定義模型輸出，如標記位置、風險評分（0-100 分）或分類建議，指引醫師解讀結果。"},
-    {"title": "介入目的", "desc": "說明臨床用途（如輔助診斷、分流）及其預期解決痛點。"},
-    {"title": "警告與範圍外使用", "desc": "限制不適用情境（如特定機型、非適應症族群），並強調不得獨立作為診斷工具。"},
-    {"title": "開發詳情及輸入特徵", "desc": "揭露訓練資料來源、特徵維度（如年齡、性別、影像維度等）及模型架構（如 CNN）。"},
-    {"title": "確保公平性的過程", "desc": "詳述如何減少演算法偏見，確保在不同種族、性別或年齡層表現的一致性。"},
-    {"title": "外部驗證過程", "desc": "展示單一中心外部驗證或跨中心聯邦驗證在真實數據表現；若為聯邦驗證須詳列中心數量及各院資料量等資訊"},
-    {"title": "量化表現指標", "desc": "提供靈敏度、特異性、AUC 等具體統計數據，作為模型效能基準。"},
-    {"title": "持續維護與監控", "desc": "描述部署後的技術支援、監控團隊及更新計畫，確保系統在臨床現場穩定性。"},
-    {"title": "更新與持續驗證計畫", "desc": "規定再訓練頻率與定期驗證門檻，以應對醫療環境變遷的性能波動。"}
+    {"title": "介入詳情及輸出", "desc": "需清楚定義模型輸出，如標記位置、風險評分（0-100 分）或分類建議，指引醫師解讀結果。"},
+    {"title": "介入目的", "desc": "說明臨床用途（如輔助診斷、分流）及其預期解決痛點。"},
+    {"title": "警告與範圍外使用", "desc": "限制不適用情境（如特定機型、非適應症族群），並強調不得獨立作為診斷工具。"},
+    {"title": "開發詳情及輸入特徵", "desc": "揭露訓練資料來源、特徵維度（如年齡、性別、影像維度等）及模型架構（如 CNN）。"},
+    {"title": "確保公平性的過程", "desc": "詳述如何減少演算法偏見，確保在不同種族、性別或年齡層表現的一致性。"},
+    {"title": "外部驗證過程", "desc": "展示單一中心外部驗證或跨中心聯邦驗證在真實數據表現；若為聯邦驗證須詳列中心數量及各院資料量等資訊"},
+    {"title": "量化表現指標", "desc": "提供靈敏度、特異性、AUC 等具體統計數據，作為模型效能基準。"},
+    {"title": "持續維護與監控", "desc": "描述部署後的技術支援、監控團隊及更新計畫，確保系統在臨床現場穩定性。"},
+    {"title": "更新與持續驗證計畫", "desc": "規定再訓練頻率與定期驗證門檻，以應對醫療環境變遷的性能波動。"}
 ]
 
 GOVERNANCE_2 = [
-    {"title": "可解釋性分析", "desc": "詳述模型決策依據是否導入SHAP、Grad-CAM、LIME、Saliency Map、Attention Map等，輔助醫師驗證輸出結果。"},
-    {"title": "AI生命週期管理", "desc": "系統是否具定期監測與性能評估計畫，以適應醫療數據漂移並涵蓋維護、更新與模型退役之程序。"}
+    {"title": "可解釋性分析", "desc": "詳述模型決策依據是否導入SHAP、Grad-CAM、LIME、Saliency Map、Attention Map等，輔助醫師驗證輸出結果。"},
+    {"title": "AI生命週期管理", "desc": "系統是否具定期監測與性能評估計畫，以適應醫療數據漂移並涵蓋維護、更新與模型退役之程序。"}
 ]
 
 # ---------- 3. 功能函式 ----------
