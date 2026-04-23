@@ -6,7 +6,7 @@ import base64
 import datetime
 import pandas as pd
 import streamlit as st
-import fitz  # PyMuPDF
+import fitz
 import requests
 from io import StringIO, BytesIO # 新增 BytesIO 用於 Excel 匯出
 from dotenv import load_dotenv
