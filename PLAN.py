@@ -182,7 +182,7 @@ def	generalize_feedback(specific_feedback):
 				只回傳轉化後的文字，不要有其他解釋。
 				"""
 				response	=	model.generate_content(prompt,	generation_config={"response_mime_type":	"text/plain"})
-				return	response.text.strip() 	 	 
+				return response.text.strip() 	 	 
 
 
 
